@@ -1,0 +1,7 @@
+[package]
+name = "d2fileformats"
+version = "0.1.0"
+authors = ["jon"]
+edition = "2018"
+
+[dependencies]
