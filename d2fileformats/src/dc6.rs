@@ -1,4 +1,4 @@
-use std::io::{Error, Cursor, ErrorKind, Seek, SeekFrom};
+use std::io::{Error, Cursor, Seek, SeekFrom};
 use byteorder::{ReadBytesExt, LittleEndian};
 use ndarray::prelude::*;
 
@@ -23,13 +23,12 @@ pub struct Dc6Header {
 
 impl Dc6Header {
     fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Header, Error> {
-        // TODO: Error handling
-        let version = reader.read_u32::<LittleEndian>().unwrap();
-        let flags = reader.read_u32::<LittleEndian>().unwrap();
-        let encoding = reader.read_u32::<LittleEndian>().unwrap();
-        let termination = reader.read_u32::<LittleEndian>().unwrap();
-        let directions = reader.read_u32::<LittleEndian>().unwrap();
-        let frames = reader.read_u32::<LittleEndian>().unwrap();
+        let version = reader.read_u32::<LittleEndian>()?;
+        let flags = reader.read_u32::<LittleEndian>()?;
+        let encoding = reader.read_u32::<LittleEndian>()?;
+        let termination = reader.read_u32::<LittleEndian>()?;
+        let directions = reader.read_u32::<LittleEndian>()?;
+        let frames = reader.read_u32::<LittleEndian>()?;
 
         Ok(Dc6Header {
             version,
@@ -42,8 +41,46 @@ impl Dc6Header {
     }
 }
 
+pub struct Dc6 {
+    pub header: Dc6Header,
+    pub frames: Vec<Dc6Frame>,
+}
+
+impl Dc6 {
+    pub fn from(file_bytes: &[u8]) -> Result<Dc6, Error> {
+        let mut reader = Cursor::new(file_bytes);
+
+        let header = Dc6Header::from(&mut reader)?;
+        let total_frames = (header.directions * header.frames) as usize;
+
+        let mut frame_offsets: Vec<u64> = Vec::with_capacity(total_frames);
+        for _ in 0..total_frames {
+            let offset = reader.read_u32::<LittleEndian>()?;
+            frame_offsets.push(offset as u64);
+        }
+
+        let mut frames: Vec<Dc6Frame> = Vec::with_capacity(total_frames);
+        for direction in 0..header.directions {
+            for frame_num in 0..header.frames {
+                let frame_index = ((direction * header.frames) + frame_num) as usize;
+                reader.seek(SeekFrom::Start(frame_offsets[frame_index]))?;
+
+                let frame = Dc6Frame::from(&mut reader)?;
+                frames.push(frame);
+            }
+        }
+
+        Ok(Dc6 {
+            header,
+            frames
+        })
+    }
+}
+
 pub struct Dc6FrameHeader {
-    /// If flipped is 0 the frames colors are arranged bottom right to top left
+    /// If flipped is 0 the pixels for this frame should be (de)serialized in the appropriate order
+    /// 0 = bottom right to top left
+    /// ?1 = top left to bottom right?
     pub flipped: u32,
     pub width: i32,
     pub height: i32,
@@ -56,15 +93,14 @@ pub struct Dc6FrameHeader {
 
 impl Dc6FrameHeader {
     fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6FrameHeader, Error> {
-        // TODO: Error handling
-        let flipped = reader.read_u32::<LittleEndian>().unwrap();
-        let width = reader.read_i32::<LittleEndian>().unwrap();
-        let height = reader.read_i32::<LittleEndian>().unwrap();
-        let offset_x = reader.read_i32::<LittleEndian>().unwrap();
-        let offset_y = reader.read_i32::<LittleEndian>().unwrap();
-        let unknown = reader.read_u32::<LittleEndian>().unwrap();
-        let next_block = reader.read_i32::<LittleEndian>().unwrap();
-        let length = reader.read_u32::<LittleEndian>().unwrap();
+        let flipped = reader.read_u32::<LittleEndian>()?;
+        let width = reader.read_i32::<LittleEndian>()?;
+        let height = reader.read_i32::<LittleEndian>()?;
+        let offset_x = reader.read_i32::<LittleEndian>()?;
+        let offset_y = reader.read_i32::<LittleEndian>()?;
+        let unknown = reader.read_u32::<LittleEndian>()?;
+        let next_block = reader.read_i32::<LittleEndian>()?;
+        let length = reader.read_u32::<LittleEndian>()?;
 
         Ok(Dc6FrameHeader {
             flipped,
@@ -80,23 +116,18 @@ impl Dc6FrameHeader {
 }
 
 pub struct Dc6Frame {
+    /// The header information
     pub header: Dc6FrameHeader,
     /// The pixel palette indices for this frame
+    /// This field is arranged such that [(0,0)] is top left
+    /// When serialized it should be written in the order denoted by [header.flipped](Dc6FrameHeader::flipped)
     pub pixels: Array2<u8>
 }
 
-const TRANSPARENT_OPCODE: u8 = 0x80;
-
 impl Dc6Frame {
     fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Frame, Error> {
-        // TODO: Error handling
-        let header = Dc6FrameHeader::from(reader).unwrap();
-        let mut pixels: Array2<u8> = Array2::zeros((header.width as usize, header.height as usize));
-        if header.flipped == 0 {
-            Dc6Frame::decode_pixels_bottom_top(reader, &mut pixels, &header);
-        } else {
-            return Err(Error::new(ErrorKind::NotFound, "Top to bottom decode not implemented"));
-        }
+        let header = Dc6FrameHeader::from(reader)?;
+        let pixels: Array2<u8> = Dc6Frame::decode_pixels(reader, &header)?;
 
         Ok(Dc6Frame {
             header,
@@ -104,16 +135,31 @@ impl Dc6Frame {
         })
     }
 
-    fn decode_pixels_bottom_top(reader: &mut Cursor<&[u8]>, pixels: &mut Array2<u8>, frame_header: &Dc6FrameHeader) {
-        // TODO: Error handling
+    fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>, Error> {
+        if frame_header.flipped == 0 {
+            return Dc6Frame::decode_pixels_bottom_top(reader, &frame_header);
+        } else {
+            unimplemented!();
+        }
+    }
+
+    fn decode_pixels_bottom_top(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>, Error> {
+        const TRANSPARENT_OPCODE: u8 = 0x80;
+
+        let mut pixels: Array2<u8> = Array2::zeros((frame_header.width as usize, frame_header.height as usize));
         let mut x: usize = 0;
         let mut y: usize = (frame_header.height - 1) as usize;
 
         let mut i = 0;
         while i < frame_header.length {
-            let opcode = reader.read_u8().unwrap();
+            let opcode = reader.read_u8()?;
             if opcode == TRANSPARENT_OPCODE {
                 // The rest of the current line is blank
+                // If we are on the last line then just break now
+                if i == frame_header.length - 1 {
+                    break;
+                }
+
                 x = 0;
                 y -= 1;
             } else if (opcode & TRANSPARENT_OPCODE) > 0 {
@@ -122,7 +168,7 @@ impl Dc6Frame {
             } else {
                 // opcode number of palette indices in a row
                 for _ in 0..opcode {
-                    pixels[(x, y)] = reader.read_u8().unwrap();
+                    pixels[(x, y)] = reader.read_u8()?;
                     i += 1;
                     x += 1;
                 }
@@ -130,39 +176,7 @@ impl Dc6Frame {
 
             i += 1;
         }
-    }
-}
 
-pub struct Dc6 {
-    pub header: Dc6Header,
-    pub frames: Vec<Dc6Frame>,
-}
-
-impl Dc6 {
-    pub fn from(file_bytes: &[u8]) -> Result<Dc6, Error> {
-        let mut reader = Cursor::new(file_bytes);
-
-        // TODO: Error handling
-        let header = Dc6Header::from(&mut reader).unwrap();
-        let total_frames = (header.directions * header.frames) as usize;
-
-        let mut frame_offsets: Vec<u64> = Vec::with_capacity(total_frames);
-        for _ in 0..total_frames {
-            frame_offsets.push(reader.read_u32::<LittleEndian>().unwrap() as u64);
-        }
-
-        let mut frames: Vec<Dc6Frame> = Vec::with_capacity(total_frames);
-        for direction in 0..header.directions {
-            for frame_num in 0..header.frames {
-                let frame_index = ((direction * header.frames) + frame_num) as usize;
-                reader.seek(SeekFrom::Start(frame_offsets[frame_index])).unwrap();
-                frames.push(Dc6Frame::from(&mut reader).unwrap());
-            }
-        }
-
-        Ok(Dc6 {
-            header,
-            frames
-        })
+        return Ok(pixels);
     }
 }
