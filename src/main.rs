@@ -3,6 +3,8 @@ extern crate graphics;
 extern crate opengl_graphics;
 extern crate piston;
 extern crate mpq;
+extern crate image;
+extern crate vecmath;
 
 use glutin_window::GlutinWindow as Window;
 use opengl_graphics::OpenGL;
