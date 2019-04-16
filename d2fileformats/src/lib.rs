@@ -3,6 +3,7 @@ extern crate byteorder;
 
 pub mod palette;
 pub mod dc6;
+pub mod dcc;
 
 #[cfg(test)]
 mod tests {

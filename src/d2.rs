@@ -8,6 +8,10 @@ use std::io::Error;
 use image::{RgbaImage, ImageBuffer};
 use std::mem;
 
+struct D2Texture {
+    pub texture: Texture
+}
+
 pub struct D2 {
     gl: GlGraphics,
     texture: Option<Texture>
