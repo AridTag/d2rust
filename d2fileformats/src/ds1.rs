@@ -4,13 +4,26 @@ use std::cmp::min;
 use std::fmt::{Debug, Formatter};
 use crate::read_string::ReadString;
 use ndarray::Array2;
+use std::ops::RangeInclusive;
 
+#[derive(Clone)]
 pub struct Layer<T> {
     pub width: u32,
     pub height: u32,
     pub cells: Array2<T>
 }
 
+impl<T> Layer<T> where T: Clone + Default {
+    fn new(width: u32, height: u32) -> Layer<T> {
+        Layer {
+            width,
+            height,
+            cells: Array2::from_elem((width as usize, height as usize), Default::default())
+        }
+    }
+}
+
+#[derive(Clone,Default)]
 pub struct WallCell {
     pub prop1: u8,
     pub prop2: u8,
@@ -21,7 +34,24 @@ pub struct WallCell {
     pub flags: u8
 }
 
+#[derive(Clone,Default)]
 pub struct FloorCell {
+    pub prop1: u8,
+    pub prop2: u8,
+    pub prop3: u8,
+    pub prop4: u8,
+    pub bt_idx: i32,
+    pub flags: u8
+}
+
+#[derive(Clone,Default)]
+pub struct TagCell {
+    pub prop1: u32,
+    pub flags: u8
+}
+
+#[derive(Clone,Default)]
+pub struct ShadowCell {
     pub prop1: u8,
     pub prop2: u8,
     pub prop3: u8,
@@ -65,7 +95,9 @@ pub struct Ds1 {
     pub tag_layer_count: u32,
 
     pub wall_layers: Vec<Layer<WallCell>>,
-    pub floor_layers: Vec<Layer<WallCell>>,
+    pub floor_layers: Vec<Layer<FloorCell>>,
+    pub shadow_layers: Vec<Layer<ShadowCell>>,
+    pub tag_layers: Vec<Layer<TagCell>>,
 }
 
 impl Ds1 {
@@ -97,7 +129,7 @@ impl Ds1 {
 
         if version >= 9 && version <= 13 {
             // Skip 2 u32 for some reason
-            reader.seek(SeekFrom::Current(8));
+            reader.seek(SeekFrom::Current(8))?;
         }
 
         let mut shadow_layer_count = 1u32;
@@ -113,16 +145,74 @@ impl Ds1 {
             }
         }
 
-        let mut layer_order = [1, 9, 5, 12, 11];
-        let mut total_layers: u32 = 5;
+        // TODO: This whole "layer_order" thing is just terrible
+        let mut layer_order = vec![1, 9, 5, 12, 11];
         if version >= 4 {
-            total_layers = (2 * wall_layer_count) + floor_layer_count + shadow_layer_count + tag_layer_count;
+            layer_order = vec![];
+            for i in 0..wall_layer_count {
+                layer_order.push(1 + i); // cells for wall layer i
+                layer_order.push(5 + i); // wall cells orientations
+            }
+            for i in 0..floor_layer_count {
+                layer_order.push(9 + i); // cells for floor layer i
+            }
+
+            // TODO: Should we support multiple layers of these?
+            if shadow_layer_count != 0 {
+                layer_order.push(11); // cells for shadow layer i
+            }
+            if tag_layer_count != 0 {
+                layer_order.push(12); // cells for tag layer i
+            }
         }
 
-        for i in 0..total_layers {
+        let mut wall_layers: Vec<Layer<WallCell>> = vec![Layer::<WallCell>::new(width, height); wall_layer_count as usize];
+        for read_type in layer_order {
             for y in 0..height {
                 for x in 0..width {
+                    // TODO: branching for every cell in every layer...seems needlessly "slow"
+                    // really goes along with the previous one for "layer_order" garbage
+                    match read_type {
+                        num @ 1..=4 => {
+                            // Read wall cell data
+                            let layer_index = (num - 1) as usize;
+                            let layer: &mut Layer<WallCell> = wall_layers.get_mut(layer_index).unwrap();
+                            let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
+                            cell.prop1 = reader.read_u8()?;
+                            cell.prop2 = reader.read_u8()?;
+                            cell.prop3 = reader.read_u8()?;
+                            cell.prop4 = reader.read_u8()?;
+                        }
+
+                        num @ 5..=8 => {
+                            let layer_index = (num - 5) as usize;
+                            let layer: &mut Layer<WallCell> = wall_layers.get_mut(layer_index).unwrap();
+                            let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
+
+                            if version < 7 {
+                                // lookup direction
+                            } else {
+                                cell.orientation = reader.read_u8()?;
+                            }
+                        }
+
+                        num @ 9..=10 => {
+
+                        }
+
+                        num @ 11 => {
+
+                        }
+
+                        num @ 12 => {
+
+                        }
+
+                        _ => {
+
+                        }
+                    }
                 }
             }
         }
@@ -140,7 +230,9 @@ impl Ds1 {
             shadow_layer_count,
             tag_layer_count,
             wall_layers: vec![],
-            floor_layers: vec![]
+            floor_layers: vec![],
+            shadow_layers: vec![],
+            tag_layers: vec![],
         })
     }
 }

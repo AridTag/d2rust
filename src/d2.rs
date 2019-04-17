@@ -9,10 +9,6 @@ use std::io::Error;
 use image::{RgbaImage, ImageBuffer};
 use std::mem;
 
-struct D2Texture {
-    pub texture: Texture
-}
-
 pub struct D2 {
     gl: GlGraphics,
     texture: Option<Texture>
@@ -43,7 +39,7 @@ impl D2 {
 
         let texture = match self.create_texture(&loading_screen, &palette) {
             Ok(t) => t,
-            Err(e) => panic!("eek!")
+            Err(_) => panic!("eek!")
         };
 
         self.texture = Some(texture);
@@ -61,12 +57,8 @@ impl D2 {
     pub fn render(&mut self, args: &RenderArgs) {
         use graphics::*;
 
-        const BLACK: Color = [0.0, 0.0, 0.0, 1.0];
         const CF_BLUE: Color = [100.0 / 255.0, 149.0 / 255.0, 237.0 / 255.0, 1.0];
-        const GREEN: Color = [0.0, 1.0, 0.0, 1.0];
-        const RED:   Color = [1.0, 0.0, 0.0, 1.0];
 
-        let square = rectangle::square(0.0, 0.0, 50.0);
         let rotation: f64 = 0.0;
         let (x, y) = (args.width / 2.0, args.height / 2.0);
 
@@ -77,8 +69,6 @@ impl D2 {
             let transform = ctx.transform.trans(x, y)
                                .rot_rad(rotation)
                                .trans(-(img.get_width() as f64 / 2.0), -(img.get_height() as f64 / 2.0));
-
-            /*rectangle(RED, square, transform, gl);*/
 
             image(&img, transform, gl);
         });
