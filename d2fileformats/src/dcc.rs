@@ -1,20 +1,20 @@
 
 pub struct DccHeader {
-    signature: u8,
-    version: u8,
-    num_directions: u8,
-    frames_per_direction: u32,
-    tag: u32,
-    final_dc6_size: u32,
+    pub signature: u8,
+    pub version: u8,
+    pub num_directions: u8,
+    pub frames_per_direction: u32,
+    pub tag: u32,
+    pub final_dc6_size: u32,
 }
 
 pub struct DccFrame {
-    unknown1: u32,
-    width: u32,
-    height: u32,
-    x_offset: i32,
-    y_offset: i32,
-    optional_data: u32,
-    coded_data: u32,
-    flipped: u32
+    pub unknown1: u32,
+    pub width: u32,
+    pub height: u32,
+    pub x_offset: i32,
+    pub y_offset: i32,
+    pub optional_data: u32,
+    pub coded_data: u32,
+    pub flipped: u32
 }

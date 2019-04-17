@@ -4,6 +4,7 @@ use graphics::types::Color;
 use mpq::Archive;
 use d2fileformats::palette::Palette;
 use d2fileformats::dc6::Dc6;
+use d2fileformats::ds1::Ds1;
 use std::io::Error;
 use image::{RgbaImage, ImageBuffer};
 use std::mem;
@@ -27,22 +28,18 @@ impl D2 {
 
     pub fn init(&mut self) {
         let mut archive = Archive::open("D:\\MedianXL\\d2data.mpq").expect("Where's the archive bro?");
+
         let file = archive.open_file("data\\global\\palette\\loading\\pal.dat").expect("where's the palette bro?");
-
         let mut buf: Vec<u8> = vec![0; file.size() as usize];
-
-        file.read(&mut archive, &mut buf).expect("Failed to read palette bytes?");
-        let palette = Palette::from(&buf[..]).expect("failed to load palette");
-        for i in 0..palette.colors.len() {
-            println!("[{}] - {:?}", i, palette.colors[i]);
-        }
-
         let file2 = archive.open_file("data\\global\\ui\\loading\\loadingscreen.dc6").expect("Where's the dc6 bro?");
         let mut buf2 = vec![0u8; file2.size() as usize];
-
+        file.read(&mut archive, &mut buf).expect("Failed to read palette bytes?");
         file2.read(&mut archive, &mut buf2).expect("Failed to read dc6 bytes?");
+        let palette = Palette::from(&buf[..]).expect("failed to load palette");
         let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");
-        println!("Frames: {}", loading_screen.header.frames);
+        //println!("Frames: {}", loading_screen.header.frames);
+
+        self.test_ds1(&mut archive);
 
         let texture = match self.create_texture(&loading_screen, &palette) {
             Ok(t) => t,
@@ -50,6 +47,15 @@ impl D2 {
         };
 
         self.texture = Some(texture);
+    }
+
+    fn test_ds1(&self, archive: &mut Archive) {
+        let file3 = archive.open_file("data\\global\\tiles\\ACT1\\TOWN\\townNE.ds1").expect("");
+        let mut buf3 = vec![0u8; file3.size() as usize];
+
+        file3.read(archive, &mut buf3).expect("");
+        let town_ne = Ds1::from(&buf3).expect("");
+        println!("{:?}", town_ne);
     }
 
     pub fn render(&mut self, args: &RenderArgs) {
