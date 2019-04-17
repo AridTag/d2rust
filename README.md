@@ -1,5 +1,11 @@
 ## d2rust
 
+### Purpose
+
+This project is being developed largely just so I can learn rust. There **will** be bad practices showcased here.
+Feel free to point out things that are not idiomatic.
+
+
 #### Current State
 
 Palette and dc6 images can be loaded and rendered. Though further work and testing needs to be done.
