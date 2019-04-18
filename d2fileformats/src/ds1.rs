@@ -1,4 +1,4 @@
-use std::io::{Error, Cursor, Seek, SeekFrom};
+use std::io::{Error, Cursor, Seek, SeekFrom, ErrorKind};
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::cmp::min;
 use std::fmt::{Debug, Formatter};
@@ -102,6 +102,10 @@ pub struct Ds1 {
 
 impl Ds1 {
     pub fn from(file_bytes: &[u8]) -> Result<Ds1, Error> {
+        let orientation_lookup: [u8; 25] = [0x00, 0x01, 0x02, 0x01, 0x02, 0x03, 0x03, 0x05, 0x05, 0x06,
+            0x06, 0x07, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+            0x0F, 0x10, 0x11, 0x12, 0x14];
+
         let mut reader = Cursor::new(file_bytes);
 
         let version = reader.read_u32::<LittleEndian>()?;
@@ -132,10 +136,13 @@ impl Ds1 {
             reader.seek(SeekFrom::Current(8))?;
         }
 
-        let mut shadow_layer_count = 1u32;
-        let mut wall_layer_count   = 1u32;
-        let mut floor_layer_count  = 1u32;
-        let mut tag_layer_count    = 1u32;
+        let mut shadow_layer_count: u32 = 1;
+        let mut wall_layer_count: u32 = 1;
+        let mut floor_layer_count: u32 = 1;
+        let mut tag_layer_count: u32 = 0;
+        if version >= 10 && (tag_type == 1 || tag_type == 2) {
+            tag_layer_count = 1;
+        }
 
         if version >= 4 {
             wall_layer_count = reader.read_u32::<LittleEndian>()?;
@@ -167,6 +174,9 @@ impl Ds1 {
         }
 
         let mut wall_layers: Vec<Layer<WallCell>> = vec![Layer::<WallCell>::new(width, height); wall_layer_count as usize];
+        let mut floor_layers: Vec<Layer<FloorCell>> = vec![Layer::<FloorCell>::new(width, height); floor_layer_count as usize];
+        let mut shadow_layers: Vec<Layer<ShadowCell>> = vec![Layer::<ShadowCell>::new(width, height); shadow_layer_count as usize];
+        let mut tag_layers: Vec<Layer<TagCell>> = vec![Layer::<TagCell>::new(width, height); tag_layer_count as usize];
         for read_type in layer_order {
             for y in 0..height {
                 for x in 0..width {
@@ -191,30 +201,53 @@ impl Ds1 {
                             let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
                             if version < 7 {
-                                // lookup direction
+                                let index = reader.read_u8()?;
+                                cell.orientation = orientation_lookup[index as usize];
                             } else {
                                 cell.orientation = reader.read_u8()?;
                             }
                         }
 
                         num @ 9..=10 => {
+                            let layer_index = (num - 9) as usize;
+                            let layer: &mut Layer<FloorCell> = floor_layers.get_mut(layer_index).unwrap();
+                            let cell: &mut FloorCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
+                            cell.prop1 = reader.read_u8()?;
+                            cell.prop2 = reader.read_u8()?;
+                            cell.prop3 = reader.read_u8()?;
+                            cell.prop4 = reader.read_u8()?;
                         }
 
                         num @ 11 => {
+                            let layer_index = (num - 11) as usize;
+                            let layer: &mut Layer<ShadowCell> = shadow_layers.get_mut(layer_index).unwrap();
+                            let cell: &mut ShadowCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
+                            cell.prop1 = reader.read_u8()?;
+                            cell.prop2 = reader.read_u8()?;
+                            cell.prop3 = reader.read_u8()?;
+                            cell.prop4 = reader.read_u8()?;
                         }
 
                         num @ 12 => {
+                            let layer_index = (num - 12) as usize;
+                            let layer: &mut Layer<TagCell> = tag_layers.get_mut(layer_index).unwrap();
+                            let cell: &mut TagCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
+                            cell.prop1 = reader.read_u32::<LittleEndian>()?; // TODO: ??? (UDWORD)* ((UDWORD *)bptr);
                         }
 
-                        _ => {
-
+                        other @ _ => {
+                            panic!("Unknown layer type {}", other)
                         }
                     }
                 }
             }
+        }
+
+        if version >= 2 {
+            // Time for object data
         }
 
         Ok(Ds1 {
@@ -229,10 +262,10 @@ impl Ds1 {
             floor_layer_count,
             shadow_layer_count,
             tag_layer_count,
-            wall_layers: vec![],
-            floor_layers: vec![],
-            shadow_layers: vec![],
-            tag_layers: vec![],
+            wall_layers,
+            floor_layers,
+            shadow_layers,
+            tag_layers,
         })
     }
 }
@@ -249,9 +282,70 @@ impl Debug for Ds1 {
             write!(f, "    {}\n", file)?;
         }
         write!(f, "wall_layers   : {}\n", self.wall_layer_count)?;
+        for layer in &self.wall_layers {
+            let first_cell = layer.cells.first();
+            match first_cell {
+                Some(c) => {
+                    write!(f, "    First Cell\n")?;
+                    write!(f, "      prop1 : {}\n", c.prop1)?;
+                    write!(f, "      prop2 : {}\n", c.prop2)?;
+                    write!(f, "      prop3 : {}\n", c.prop3)?;
+                    write!(f, "      prop4 : {}\n", c.prop4)?;
+                }
+
+                None => {
+                    write!(f, "    no cells\n")?;
+                }
+            }
+        }
         write!(f, "floor_layers  : {}\n", self.floor_layer_count)?;
+        for layer in &self.floor_layers {
+            let first_cell = layer.cells.first();
+            match first_cell {
+                Some(c) => {
+                    write!(f, "    First Cell\n")?;
+                    write!(f, "      prop1 : {}\n", c.prop1)?;
+                    write!(f, "      prop2 : {}\n", c.prop2)?;
+                    write!(f, "      prop3 : {}\n", c.prop3)?;
+                    write!(f, "      prop4 : {}\n", c.prop4)?;
+                }
+
+                None => {
+                    write!(f, "    no cells\n")?;
+                }
+            }
+        }
         write!(f, "shadow_layers : {}\n", self.shadow_layer_count)?;
+        for layer in &self.shadow_layers {
+            let first_cell = layer.cells.first();
+            match first_cell {
+                Some(c) => {
+                    write!(f, "    First Cell\n")?;
+                    write!(f, "      prop1 : {}\n", c.prop1)?;
+                    write!(f, "      prop2 : {}\n", c.prop2)?;
+                    write!(f, "      prop3 : {}\n", c.prop3)?;
+                    write!(f, "      prop4 : {}\n", c.prop4)?;
+                }
+
+                None => {
+                    write!(f, "    no cells\n")?;
+                }
+            }
+        }
         write!(f, "tag_layers    : {}\n", self.tag_layer_count)?;
+        for layer in &self.tag_layers {
+            let first_cell = layer.cells.first();
+            match first_cell {
+                Some(c) => {
+                    write!(f, "    First Cell\n")?;
+                    write!(f, "      prop1 : {}\n", c.prop1)?;
+                }
+
+                None => {
+                    write!(f, "    no cells\n")?;
+                }
+            }
+        }
         Ok(())
     }
 }
