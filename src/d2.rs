@@ -46,7 +46,7 @@ impl D2 {
     }
 
     fn test_ds1(&self, archive: &mut Archive) {
-        let file3 = archive.open_file("data\\global\\tiles\\ACT1\\TOWN\\townNE.ds1").expect("");
+        let file3 = archive.open_file("data\\global\\tiles\\ACT1\\TOWN\\townEW.ds1").expect("");
         let mut buf3 = vec![0u8; file3.size() as usize];
 
         file3.read(archive, &mut buf3).expect("");

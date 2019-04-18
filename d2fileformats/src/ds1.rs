@@ -60,6 +60,17 @@ pub struct ShadowCell {
     pub flags: u8
 }
 
+#[derive(Clone,Default)]
+pub struct Object {
+    pub type_: u32,
+    pub id: u32,
+    /// The objects x position in sub-cell coordinates
+    pub x: u32,
+    /// The objects y position in sub-cell coordinates
+    pub y: u32,
+    pub flags: u32,
+}
+
 pub struct Ds1 {
     /// The ds1 format version
     pub version: u32,
@@ -98,6 +109,9 @@ pub struct Ds1 {
     pub floor_layers: Vec<Layer<FloorCell>>,
     pub shadow_layers: Vec<Layer<ShadowCell>>,
     pub tag_layers: Vec<Layer<TagCell>>,
+
+    pub object_count: u32,
+    pub objects: Vec<Object>,
 }
 
 impl Ds1 {
@@ -200,12 +214,13 @@ impl Ds1 {
                             let layer: &mut Layer<WallCell> = wall_layers.get_mut(layer_index).unwrap();
                             let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
 
+                            let value = reader.read_u8()?;
                             if version < 7 {
-                                let index = reader.read_u8()?;
-                                cell.orientation = orientation_lookup[index as usize];
+                                cell.orientation = orientation_lookup[value as usize];
                             } else {
-                                cell.orientation = reader.read_u8()?;
+                                cell.orientation = value;
                             }
+                            reader.seek(SeekFrom::Current(3)); // skip 3 bytes?
                         }
 
                         num @ 9..=10 => {
@@ -246,8 +261,22 @@ impl Ds1 {
             }
         }
 
+        let mut object_count: u32 = 0;
+        let mut objects: Vec<Object> = vec![];
         if version >= 2 {
             // Time for object data
+            object_count = reader.read_u32::<LittleEndian>()?;
+            objects = vec![Default::default(); object_count as usize];
+            for obj in objects.iter_mut() {
+                obj.type_ = reader.read_u32::<LittleEndian>()?;
+                obj.id = reader.read_u32::<LittleEndian>()?;
+                obj.x = reader.read_u32::<LittleEndian>()?;
+                obj.y = reader.read_u32::<LittleEndian>()?;
+
+                if version >= 5 {
+                    obj.flags = reader.read_u32::<LittleEndian>()?;
+                }
+            }
         }
 
         Ok(Ds1 {
@@ -266,6 +295,8 @@ impl Ds1 {
             floor_layers,
             shadow_layers,
             tag_layers,
+            object_count,
+            objects
         })
     }
 }
@@ -346,6 +377,15 @@ impl Debug for Ds1 {
                 }
             }
         }
+        write!(f, "object_count  : {}\n", self.object_count)?;
+        for obj in &self.objects {
+            write!(f, "    Obj [id {}]\n", obj.id)?;
+            write!(f, "      type  : {}\n", obj.type_)?;
+            write!(f, "      x     : {}\n", obj.x)?;
+            write!(f, "      y     : {}\n", obj.y)?;
+            write!(f, "      flags : {}\n", obj.flags)?;
+        }
+
         Ok(())
     }
 }
