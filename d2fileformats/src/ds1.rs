@@ -70,6 +70,15 @@ pub struct Object {
     pub flags: u32,
 }
 
+#[derive(Clone,Default)]
+pub struct TagGroup {
+    pub tile_x: u32,
+    pub tile_y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub unknown: u32,
+}
+
 pub struct Ds1 {
     /// The ds1 format version
     pub version: u32,
@@ -95,6 +104,7 @@ pub struct Ds1 {
     pub tag_layers: Vec<Layer<TagCell>>,
 
     pub objects: Vec<Object>,
+    pub tag_groups: Vec<TagGroup>,
 }
 
 impl Ds1 {
@@ -223,6 +233,13 @@ impl Ds1 {
         }
 
         let objects = Ds1::read_objects(&mut reader, version)?;
+        let tag_groups = Ds1::read_tag_groups(&mut reader, version, tag_type)?;
+
+        if Ds1::is_reader_at_end(&mut reader) {
+            // TODO: we need to return early as the file ended prematurely in tag groups
+        }
+
+        
 
         Ok(Ds1 {
             version,
@@ -235,8 +252,117 @@ impl Ds1 {
             floor_layers,
             shadow_layers,
             tag_layers,
-            objects
+            objects,
+            tag_groups,
         })
+    }
+
+    fn is_reader_at_end(reader: &mut Cursor<&[u8]>) -> bool {
+        let current_pos = reader.position();
+        if let Err(_) = reader.seek(SeekFrom::End(0)) {
+            return true;
+        }
+        let end_pos = reader.position();
+        reader.seek(SeekFrom::Start(current_pos)).expect("this shouldn't fail (famous last words)");
+
+        return current_pos < end_pos;
+    }
+
+    fn read_tag_groups(reader: &mut Cursor<&[u8]>, version: u32, tag_type: u32) -> Result<Vec<TagGroup>, Error> {
+        if version < 12 || !(tag_type == 1 || tag_type == 2) {
+            return Ok(vec![]);
+        }
+
+        if version >= 18 {
+            // not sure why but we skip a dword
+            reader.seek(SeekFrom::Current(4))?;
+        }
+
+        // Note: When reading tag groups it is entirely possible for the file to just suddenly end.
+        // This is the case with data\global\tiles\act1\outdoors\trees.ds1 for example.
+
+        let group_count = reader.read_u32::<LittleEndian>()?;
+        let mut tag_groups: Vec<TagGroup> = vec![Default::default(); group_count as usize];
+        for group in tag_groups.iter_mut() {
+            let tile_x = reader.read_u32::<LittleEndian>();
+            match tile_x {
+                Ok(x) => {
+                    group.tile_x = x;
+                }
+
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
+                }
+
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+
+            let tile_y = reader.read_u32::<LittleEndian>();
+            match tile_y {
+                Ok(y) => {
+                    group.tile_y = y;
+                }
+
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
+                }
+
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+
+            let width = reader.read_u32::<LittleEndian>();
+            match width {
+                Ok(w) => {
+                    group.width = w;
+                }
+
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
+                }
+
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+
+            let height = reader.read_u32::<LittleEndian>();
+            match height {
+                Ok(h) => {
+                    group.height = h;
+                }
+
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
+                }
+
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+
+            if version >= 13 {
+                let unknown = reader.read_u32::<LittleEndian>();
+                match unknown {
+                    Ok(u) => {
+                        group.unknown = u;
+                    }
+
+                    Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                        break;
+                    }
+
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
+        Ok(tag_groups)
     }
 
     fn read_tag_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<TagCell>) -> Result<(), Error> {
@@ -433,6 +559,10 @@ impl Debug for Ds1 {
             write!(f, "      x     : {}\n", obj.x)?;
             write!(f, "      y     : {}\n", obj.y)?;
             write!(f, "      flags : {}\n", obj.flags)?;
+        }
+        write!(f, "tag groups    : {}\n", self.tag_groups.len())?;
+        for group in &self.tag_groups {
+            write!(f, "    at ({},{}) size ({},{}) with unknown {}\n", group.tile_x, group.tile_y, group.width, group.height, group.unknown)?;
         }
 
         Ok(())
