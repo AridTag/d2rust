@@ -4,7 +4,6 @@ use std::cmp::min;
 use std::fmt::{Debug, Formatter};
 use crate::read_string::ReadString;
 use ndarray::Array2;
-use std::ops::RangeInclusive;
 
 #[derive(Clone)]
 pub struct Layer<T> {
@@ -87,39 +86,19 @@ pub struct Ds1 {
     /// Some sort of tag layer thing
     pub tag_type: u32,
 
-    /// The number of files
-    pub file_count: u32,
-
     /// The names of the files
     pub file_names: Vec<String>,
-
-    /// The number of wall layers
-    pub wall_layer_count: u32,
-
-    /// The number of floor layers
-    pub floor_layer_count: u32,
-
-    /// The number of shadow layers
-    pub shadow_layer_count: u32,
-
-    /// The number of tag layers
-    pub tag_layer_count: u32,
 
     pub wall_layers: Vec<Layer<WallCell>>,
     pub floor_layers: Vec<Layer<FloorCell>>,
     pub shadow_layers: Vec<Layer<ShadowCell>>,
     pub tag_layers: Vec<Layer<TagCell>>,
 
-    pub object_count: u32,
     pub objects: Vec<Object>,
 }
 
 impl Ds1 {
     pub fn from(file_bytes: &[u8]) -> Result<Ds1, Error> {
-        let orientation_lookup: [u8; 25] = [0x00, 0x01, 0x02, 0x01, 0x02, 0x03, 0x03, 0x05, 0x05, 0x06,
-            0x06, 0x07, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
-            0x0F, 0x10, 0x11, 0x12, 0x14];
-
         let mut reader = Cursor::new(file_bytes);
 
         let version = reader.read_u32::<LittleEndian>()?;
@@ -136,11 +115,10 @@ impl Ds1 {
             tag_type = reader.read_u32::<LittleEndian>()?;
         }
 
-        let mut file_count = 0;
         let mut file_names = vec![];
         if version >= 3 {
-            file_count = reader.read_u32::<LittleEndian>()?;
-            for i in 0..file_count {
+            let file_count = reader.read_u32::<LittleEndian>()?;
+            for _ in 0..file_count {
                 file_names.push(reader.read_zstring()?);
             }
         }
@@ -150,7 +128,7 @@ impl Ds1 {
             reader.seek(SeekFrom::Current(8))?;
         }
 
-        let mut shadow_layer_count: u32 = 1;
+        let shadow_layer_count: u32 = 1;
         let mut wall_layer_count: u32 = 1;
         let mut floor_layer_count: u32 = 1;
         let mut tag_layer_count: u32 = 0;
@@ -192,92 +170,59 @@ impl Ds1 {
         let mut shadow_layers: Vec<Layer<ShadowCell>> = vec![Layer::<ShadowCell>::new(width, height); shadow_layer_count as usize];
         let mut tag_layers: Vec<Layer<TagCell>> = vec![Layer::<TagCell>::new(width, height); tag_layer_count as usize];
         for read_type in layer_order {
-            for y in 0..height {
-                for x in 0..width {
-                    // TODO: branching for every cell in every layer...seems needlessly "slow"
-                    // really goes along with the previous one for "layer_order" garbage
-                    match read_type {
-                        num @ 1..=4 => {
-                            // Read wall cell data
-                            let layer_index = (num - 1) as usize;
-                            let layer: &mut Layer<WallCell> = wall_layers.get_mut(layer_index).unwrap();
-                            let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
-
-                            cell.prop1 = reader.read_u8()?;
-                            cell.prop2 = reader.read_u8()?;
-                            cell.prop3 = reader.read_u8()?;
-                            cell.prop4 = reader.read_u8()?;
-                        }
-
-                        num @ 5..=8 => {
-                            let layer_index = (num - 5) as usize;
-                            let layer: &mut Layer<WallCell> = wall_layers.get_mut(layer_index).unwrap();
-                            let cell: &mut WallCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
-
-                            let value = reader.read_u8()?;
-                            if version < 7 {
-                                cell.orientation = orientation_lookup[value as usize];
-                            } else {
-                                cell.orientation = value;
-                            }
-                            reader.seek(SeekFrom::Current(3)); // skip 3 bytes?
-                        }
-
-                        num @ 9..=10 => {
-                            let layer_index = (num - 9) as usize;
-                            let layer: &mut Layer<FloorCell> = floor_layers.get_mut(layer_index).unwrap();
-                            let cell: &mut FloorCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
-
-                            cell.prop1 = reader.read_u8()?;
-                            cell.prop2 = reader.read_u8()?;
-                            cell.prop3 = reader.read_u8()?;
-                            cell.prop4 = reader.read_u8()?;
-                        }
-
-                        num @ 11 => {
-                            let layer_index = (num - 11) as usize;
-                            let layer: &mut Layer<ShadowCell> = shadow_layers.get_mut(layer_index).unwrap();
-                            let cell: &mut ShadowCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
-
-                            cell.prop1 = reader.read_u8()?;
-                            cell.prop2 = reader.read_u8()?;
-                            cell.prop3 = reader.read_u8()?;
-                            cell.prop4 = reader.read_u8()?;
-                        }
-
-                        num @ 12 => {
-                            let layer_index = (num - 12) as usize;
-                            let layer: &mut Layer<TagCell> = tag_layers.get_mut(layer_index).unwrap();
-                            let cell: &mut TagCell = layer.cells.get_mut((x as usize, y as usize)).unwrap();
-
-                            cell.prop1 = reader.read_u32::<LittleEndian>()?; // TODO: ??? (UDWORD)* ((UDWORD *)bptr);
-                        }
-
-                        other @ _ => {
-                            panic!("Unknown layer type {}", other)
-                        }
+            match read_type {
+                1..=4 => {
+                    let layer_index = (read_type - 1) as usize;
+                    if let Some(layer) = wall_layers.get_mut(layer_index) {
+                        Ds1::read_wall_cells(&mut reader, layer)?;
+                    } else {
+                        return Err(Error::from(ErrorKind::Other));//, format!("No wall layer at index {}. this shouldn't happen", layer_index)));
                     }
                 }
-            }
-        }
 
-        let mut object_count: u32 = 0;
-        let mut objects: Vec<Object> = vec![];
-        if version >= 2 {
-            // Time for object data
-            object_count = reader.read_u32::<LittleEndian>()?;
-            objects = vec![Default::default(); object_count as usize];
-            for obj in objects.iter_mut() {
-                obj.type_ = reader.read_u32::<LittleEndian>()?;
-                obj.id = reader.read_u32::<LittleEndian>()?;
-                obj.x = reader.read_u32::<LittleEndian>()?;
-                obj.y = reader.read_u32::<LittleEndian>()?;
+                5..=8 => {
+                    let layer_index = (read_type - 5) as usize;
+                    if let Some(layer) = wall_layers.get_mut(layer_index) {
+                        Ds1::read_wall_cells_orientation(&mut reader, layer, version)?;
+                    } else {
+                        return Err(Error::from(ErrorKind::Other));//, "(Orientation) No wall layer at index {}. this shouldn't happen", layer_index));
+                    }
+                }
 
-                if version >= 5 {
-                    obj.flags = reader.read_u32::<LittleEndian>()?;
+                9..=10 => {
+                    let layer_index = (read_type - 9) as usize;
+                    if let Some(layer) = floor_layers.get_mut(layer_index) {
+                        Ds1::read_floor_cells(&mut reader, layer)?;
+                    } else {
+                        return Err(Error::from(ErrorKind::Other));//, "No floor layer at index {}. This shouldn't happen", layer_index));
+                    }
+                }
+
+                11 => {
+                    let layer_index = (read_type - 11) as usize;
+                    if let Some(layer) = shadow_layers.get_mut(layer_index) {
+                        Ds1::read_shadow_cells(&mut reader, layer)?;
+                    } else {
+                        return Err(Error::from(ErrorKind::Other));//, "No shadow layer at index {}. This shouldn't happen", layer_index));
+                    }
+                }
+
+                12 => {
+                    let layer_index = (read_type - 12) as usize;
+                    if let Some(layer) = tag_layers.get_mut(layer_index) {
+                        Ds1::read_tag_cells(&mut reader, layer)?;
+                    } else {
+                        return Err(Error::from(ErrorKind::Other));//, "No tag layer at index {}. This shouldn't happen", layer_index));
+                    }
+                }
+
+                _ => {
+                    panic!("Unknown layer type {}", read_type)
                 }
             }
         }
+
+        let objects = Ds1::read_objects(&mut reader, version)?;
 
         Ok(Ds1 {
             version,
@@ -285,19 +230,123 @@ impl Ds1 {
             height,
             act,
             tag_type,
-            file_count,
             file_names,
-            wall_layer_count,
-            floor_layer_count,
-            shadow_layer_count,
-            tag_layer_count,
             wall_layers,
             floor_layers,
             shadow_layers,
             tag_layers,
-            object_count,
             objects
         })
+    }
+
+    fn read_tag_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<TagCell>) -> Result<(), Error> {
+        for y in 0..layer.height {
+            for x in 0..layer.width {
+                if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut TagCell> {
+                    cell.prop1 = reader.read_u32::<LittleEndian>()?;
+                } else {
+                    return Err(Error::from(ErrorKind::Other));//, "No tag cell at {},{}. This shouldn't happen", x, y));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_shadow_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<ShadowCell>) -> Result<(), Error> {
+        for y in 0..layer.height {
+            for x in 0..layer.width {
+                if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut ShadowCell> {
+                    cell.prop1 = reader.read_u8()?;
+                    cell.prop2 = reader.read_u8()?;
+                    cell.prop3 = reader.read_u8()?;
+                    cell.prop4 = reader.read_u8()?;
+                } else {
+                    return Err(Error::from(ErrorKind::Other));//, "No shadow cell at {},{}. This shouldn't happen", x, y));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_floor_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<FloorCell>) -> Result<(), Error> {
+        for y in 0..layer.height {
+            for x in 0..layer.width {
+                if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut FloorCell> {
+                    cell.prop1 = reader.read_u8()?;
+                    cell.prop2 = reader.read_u8()?;
+                    cell.prop3 = reader.read_u8()?;
+                    cell.prop4 = reader.read_u8()?;
+                } else {
+                    return Err(Error::from(ErrorKind::Other));//, "No floor cell at {},{}. This shouldn't happen", x, y));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_wall_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>) -> Result<(), Error> {
+        for y in 0..layer.height {
+            for x in 0..layer.width {
+                if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut WallCell> {
+                    cell.prop1 = reader.read_u8()?;
+                    cell.prop2 = reader.read_u8()?;
+                    cell.prop3 = reader.read_u8()?;
+                    cell.prop4 = reader.read_u8()?;
+                } else {
+                    return Err(Error::from(ErrorKind::Other));//, "No wall cell at {},{}. This shouldn't happen", x, y))
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_wall_cells_orientation(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>, version: u32) -> Result<(), Error> {
+        let orientation_lookup: [u8; 25] = [0x00, 0x01, 0x02, 0x01, 0x02, 0x03, 0x03, 0x05, 0x05, 0x06,
+            0x06, 0x07, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+            0x0F, 0x10, 0x11, 0x12, 0x14];
+        for y in 0..layer.height {
+            for x in 0..layer.width {
+                if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut WallCell> {
+                    let value = reader.read_u8()?;
+                    if version < 7 {
+                        cell.orientation = orientation_lookup[value as usize];
+                    } else {
+                        cell.orientation = value;
+                    }
+                    reader.seek(SeekFrom::Current(3))?; // skip 3 bytes?
+                } else {
+                    return Err(Error::from(ErrorKind::Other));//, "(Orientation) No wall cell at {},{}. This shouldn't happen", x, y))
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_objects(reader: &mut Cursor<&[u8]>, version: u32) -> Result<Vec<Object>, Error> {
+        if version < 2 {
+            // No objects prior to version 2
+            return Ok(vec![]);
+        }
+
+        let object_count = reader.read_u32::<LittleEndian>()?;
+        let mut objects: Vec<Object> = vec![Default::default(); object_count as usize];
+        for obj in objects.iter_mut() {
+            obj.type_ = reader.read_u32::<LittleEndian>()?;
+            obj.id = reader.read_u32::<LittleEndian>()?;
+            obj.x = reader.read_u32::<LittleEndian>()?;
+            obj.y = reader.read_u32::<LittleEndian>()?;
+
+            if version >= 5 {
+                obj.flags = reader.read_u32::<LittleEndian>()?;
+            }
+        }
+
+        Ok(objects)
     }
 }
 
@@ -308,11 +357,11 @@ impl Debug for Ds1 {
         write!(f, "height        : {}\n", self.height)?;
         write!(f, "act           : {}\n", self.act)?;
         write!(f, "tag_type      : {}\n", self.tag_type)?;
-        write!(f, "file_count    : {}\n", self.file_count)?;
+        write!(f, "file_count    : {}\n", self.file_names.len())?;
         for file in &self.file_names {
             write!(f, "    {}\n", file)?;
         }
-        write!(f, "wall_layers   : {}\n", self.wall_layer_count)?;
+        write!(f, "wall_layers   : {}\n", self.wall_layers.len())?;
         for layer in &self.wall_layers {
             let first_cell = layer.cells.first();
             match first_cell {
@@ -329,7 +378,7 @@ impl Debug for Ds1 {
                 }
             }
         }
-        write!(f, "floor_layers  : {}\n", self.floor_layer_count)?;
+        write!(f, "floor_layers  : {}\n", self.floor_layers.len())?;
         for layer in &self.floor_layers {
             let first_cell = layer.cells.first();
             match first_cell {
@@ -346,7 +395,7 @@ impl Debug for Ds1 {
                 }
             }
         }
-        write!(f, "shadow_layers : {}\n", self.shadow_layer_count)?;
+        write!(f, "shadow_layers : {}\n", self.shadow_layers.len())?;
         for layer in &self.shadow_layers {
             let first_cell = layer.cells.first();
             match first_cell {
@@ -363,7 +412,7 @@ impl Debug for Ds1 {
                 }
             }
         }
-        write!(f, "tag_layers    : {}\n", self.tag_layer_count)?;
+        write!(f, "tag_layers    : {}\n", self.tag_layers.len())?;
         for layer in &self.tag_layers {
             let first_cell = layer.cells.first();
             match first_cell {
@@ -377,7 +426,7 @@ impl Debug for Ds1 {
                 }
             }
         }
-        write!(f, "object_count  : {}\n", self.object_count)?;
+        write!(f, "object_count  : {}\n", self.objects.len())?;
         for obj in &self.objects {
             write!(f, "    Obj [id {}]\n", obj.id)?;
             write!(f, "      type  : {}\n", obj.type_)?;
@@ -388,13 +437,4 @@ impl Debug for Ds1 {
 
         Ok(())
     }
-}
-
-pub struct LayerHeader {
-    /// Number of wall layers to use
-    pub wall_layers: u32,
-    /// Number of floor layers to use
-    pub floor_layers: u32,
-    /// Number of shadow layers to use
-    pub shadow_layers: u32
 }
