@@ -28,9 +28,7 @@ pub struct WallCell {
     pub prop2: u8,
     pub prop3: u8,
     pub prop4: u8,
-    pub orientation: u8,
-    pub bt_idx: i32,
-    pub flags: u8
+    pub orientation: u8
 }
 
 #[derive(Clone,Default)]
@@ -39,14 +37,11 @@ pub struct FloorCell {
     pub prop2: u8,
     pub prop3: u8,
     pub prop4: u8,
-    pub bt_idx: i32,
-    pub flags: u8
 }
 
 #[derive(Clone,Default)]
 pub struct TagCell {
-    pub prop1: u32,
-    pub flags: u8
+    pub prop1: u32
 }
 
 #[derive(Clone,Default)]
@@ -54,9 +49,7 @@ pub struct ShadowCell {
     pub prop1: u8,
     pub prop2: u8,
     pub prop3: u8,
-    pub prop4: u8,
-    pub bt_idx: i32,
-    pub flags: u8
+    pub prop4: u8
 }
 
 #[derive(Clone,Default)]
@@ -68,6 +61,7 @@ pub struct Object {
     /// The objects y position in sub-cell coordinates
     pub y: u32,
     pub flags: u32,
+    pub path_nodes: Vec<PathNode>,
 }
 
 #[derive(Clone,Default)]
@@ -77,6 +71,13 @@ pub struct TagGroup {
     pub width: u32,
     pub height: u32,
     pub unknown: u32,
+}
+
+#[derive(Clone,Default)]
+pub struct PathNode {
+    pub x: u32,
+    pub y: u32,
+    pub action: u32,
 }
 
 pub struct Ds1 {
@@ -232,14 +233,14 @@ impl Ds1 {
             }
         }
 
-        let objects = Ds1::read_objects(&mut reader, version)?;
+        let mut objects: Vec<Object> = Ds1::read_objects(&mut reader, version)?;
         let tag_groups = Ds1::read_tag_groups(&mut reader, version, tag_type)?;
 
         if Ds1::is_reader_at_end(&mut reader) {
             // TODO: we need to return early as the file ended prematurely in tag groups
         }
 
-        
+        Ds1::read_npc_paths(&mut reader, version, &mut objects)?;
 
         Ok(Ds1 {
             version,
@@ -266,6 +267,48 @@ impl Ds1 {
         reader.seek(SeekFrom::Start(current_pos)).expect("this shouldn't fail (famous last words)");
 
         return current_pos < end_pos;
+    }
+
+    fn read_npc_paths(reader: &mut Cursor<&[u8]>, version: u32, objects: &mut Vec<Object>) -> Result<(), Error> {
+        let npc_path_count = reader.read_u32::<LittleEndian>()?;
+        for _ in 0..npc_path_count {
+            let node_count = reader.read_u32::<LittleEndian>()?;
+            let obj_x = reader.read_u32::<LittleEndian>()?;
+            let obj_y = reader.read_u32::<LittleEndian>()?;
+
+            let mut matching_objects = objects.iter_mut().filter(|o| o.x == obj_x && o.y == obj_y).collect::<Vec<&mut Object>>();
+            if matching_objects.len() == 0 {
+                // TODO: logging instead of println
+                println!("WARNING: No objects at position {},{}", obj_x, obj_y);
+                // TODO: This needs to skip the data
+                continue;
+            }
+
+            for _ in 0..node_count {
+                let node_x = reader.read_u32::<LittleEndian>()?;
+                let node_y = reader.read_u32::<LittleEndian>()?;
+                let mut action = 1;
+                if version >= 15 {
+                    action = reader.read_u32::<LittleEndian>()?;
+                }
+
+                for obj in matching_objects.iter_mut() {
+                    if obj.path_nodes.len() > 0 {
+                        // TODO: something should be done
+                        println!("WARNING: obj already has path nodes");
+                    }
+
+                    let node = PathNode {
+                        x: node_x,
+                        y: node_y,
+                        action
+                    };
+                    obj.path_nodes.push(node);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn read_tag_groups(reader: &mut Cursor<&[u8]>, version: u32, tag_type: u32) -> Result<Vec<TagGroup>, Error> {
@@ -555,10 +598,14 @@ impl Debug for Ds1 {
         write!(f, "object_count  : {}\n", self.objects.len())?;
         for obj in &self.objects {
             write!(f, "    Obj [id {}]\n", obj.id)?;
-            write!(f, "      type  : {}\n", obj.type_)?;
-            write!(f, "      x     : {}\n", obj.x)?;
-            write!(f, "      y     : {}\n", obj.y)?;
-            write!(f, "      flags : {}\n", obj.flags)?;
+            write!(f, "      type       : {}\n", obj.type_)?;
+            write!(f, "      x          : {}\n", obj.x)?;
+            write!(f, "      y          : {}\n", obj.y)?;
+            write!(f, "      flags      : {}\n", obj.flags)?;
+            write!(f, "      path_nodes : {}\n", obj.path_nodes.len())?;
+            for node in &obj.path_nodes {
+                write!(f, "        ({},{}) action: {}\n", node.x, node.y, node.action)?;
+            }
         }
         write!(f, "tag groups    : {}\n", self.tag_groups.len())?;
         for group in &self.tag_groups {

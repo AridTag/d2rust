@@ -23,7 +23,7 @@ impl D2 {
     }
 
     pub fn init(&mut self) {
-        let mut archive = Archive::open("D:\\MedianXL\\d2data.mpq").expect("Where's the archive bro?");
+        let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
 
         let file = archive.open_file("data\\global\\palette\\loading\\pal.dat").expect("where's the palette bro?");
         let mut buf: Vec<u8> = vec![0; file.size() as usize];
@@ -35,23 +35,25 @@ impl D2 {
         let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");
         //println!("Frames: {}", loading_screen.header.frames);
 
-        self.test_ds1(&mut archive);
-
         let texture = match self.create_texture(&loading_screen, &palette) {
             Ok(t) => t,
             Err(_) => panic!("eek!")
         };
 
         self.texture = Some(texture);
+
+        let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
+        self.test_ds1(&mut archive2);
     }
 
     fn test_ds1(&self, archive: &mut Archive) {
-        let file3 = archive.open_file("data\\global\\tiles\\ACT1\\TOWN\\townEW.ds1").expect("");
+        let filename = "data\\global\\tiles\\expansion\\Town\\townWest.ds1";
+        let file3 = archive.open_file(filename).expect("");
         let mut buf3 = vec![0u8; file3.size() as usize];
 
         file3.read(archive, &mut buf3).expect("");
-        let town_ne = Ds1::from(&buf3).expect("");
-        println!("{:?}", town_ne);
+        let ds1 = Ds1::from(&buf3).expect("");
+        println!("{}\n{:?}", filename, ds1);
     }
 
     pub fn render(&mut self, args: &RenderArgs) {
