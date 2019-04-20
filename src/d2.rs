@@ -43,17 +43,16 @@ impl D2 {
         self.texture = Some(texture);
 
         let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
-        self.test_ds1(&mut archive2);
+        let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");
     }
 
-    fn test_ds1(&self, archive: &mut Archive) {
-        let filename = "data\\global\\tiles\\expansion\\Town\\townWest.ds1";
-        let file3 = archive.open_file(filename).expect("");
+    fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
+        let file3 = archive.open_file(filename)?;
         let mut buf3 = vec![0u8; file3.size() as usize];
 
-        file3.read(archive, &mut buf3).expect("");
-        let ds1 = Ds1::from(&buf3).expect("");
-        println!("{}\n{:?}", filename, ds1);
+        file3.read(archive, &mut buf3)?;
+
+        Ds1::from(&buf3)
     }
 
     pub fn render(&mut self, args: &RenderArgs) {

@@ -34,3 +34,23 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ds1_loads() {
+        use mpq::Archive;
+        use d2fileformats::ds1::Ds1;
+
+        let archive_path = "D:\\Diablo II\\d2exp.mpq";
+        let mut archive = Archive::open(archive_path).expect(&format!("can not find archive {}", archive_path));
+
+        let filename = "data\\global\\tiles\\expansion\\Town\\townWest.ds1";
+        let archive_file = archive.open_file(filename).expect(&format!("can't find {} in {}", filename, archive_path));
+        let mut file_buffer = vec![0u8; archive_file.size() as usize];
+
+        archive_file.read(&mut archive, &mut file_buffer).expect(&format!("failed to read {}", filename));
+        let ds1 = Ds1::from(&file_buffer).expect("");
+        println!("{}\n{:?}", filename, ds1);
+    }
+}
