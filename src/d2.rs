@@ -1,28 +1,25 @@
-use piston::input::*;
-use opengl_graphics::{GlGraphics, OpenGL, Texture, TextureSettings};
-use graphics::types::Color;
 use mpq::Archive;
 use d2fileformats::palette::Palette;
 use d2fileformats::dc6::Dc6;
 use d2fileformats::ds1::Ds1;
 use std::io::Error;
-use image::{RgbaImage, ImageBuffer};
 use std::mem;
+use amethyst::assets::{AssetStorage, Loader};
+use amethyst::core::transform::Transform;
+use amethyst::ecs::prelude::{Component, DenseVecStorage};
+use amethyst::prelude::*;
+use amethyst::renderer::{
+    Camera, PngFormat, Projection, SpriteRender, SpriteSheet,
+    SpriteSheetFormat, SpriteSheetHandle, Texture, TextureMetadata,
+};
 
-pub struct D2 {
-    gl: GlGraphics,
-    texture: Option<Texture>
-}
+pub struct D2;
 
-impl D2 {
-    pub fn new(opengl: OpenGL) -> D2 {
-        D2 {
-            gl: GlGraphics::new(opengl),
-            texture: None
-        }
-    }
+pub const CAMERA_WIDTH: f32 = 800.0;
+pub const CAMERA_HEIGHT: f32 = 600.0;
 
-    pub fn init(&mut self) {
+impl SimpleState for D2 {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
 
         let file = archive.open_file("data\\global\\palette\\loading\\pal.dat").expect("where's the palette bro?");
@@ -35,16 +32,35 @@ impl D2 {
         let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");
         //println!("Frames: {}", loading_screen.header.frames);
 
-        let texture = match self.create_texture(&loading_screen, &palette) {
+        /*let texture = match self.create_texture(&loading_screen, &palette) {
             Ok(t) => t,
             Err(_) => panic!("eek!")
-        };
+        };*/
 
-        self.texture = Some(texture);
+        //self.texture = Some(texture);
 
         let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
         let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");
+
+        let world = data.world;
+        init_camera(world);
     }
+}
+
+fn init_camera(world: &mut World) {
+    let mut transform = Transform::default();
+    transform.set_z(1.0);
+    world.create_entity()
+         .with(Camera::from(Projection::orthographic(
+             0.0,
+             CAMERA_WIDTH,
+             0.0,
+             CAMERA_HEIGHT)))
+         .with(transform)
+         .build();
+}
+
+impl D2 {
 
     fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
         let file3 = archive.open_file(filename)?;
@@ -55,33 +71,7 @@ impl D2 {
         Ds1::from(&buf3)
     }
 
-    pub fn render(&mut self, args: &RenderArgs) {
-        use graphics::*;
-
-        const CF_BLUE: Color = [100.0 / 255.0, 149.0 / 255.0, 237.0 / 255.0, 1.0];
-
-        let rotation: f64 = 0.0;
-        let (x, y) = (args.width / 2.0, args.height / 2.0);
-
-        let mut img = mem::replace(&mut self.texture, None).unwrap();
-        self.gl.draw(args.viewport(), |ctx, gl| {
-            clear(CF_BLUE, gl);
-
-            let transform = ctx.transform.trans(x, y)
-                               .rot_rad(rotation)
-                               .trans(-(img.get_width() as f64 / 2.0), -(img.get_height() as f64 / 2.0));
-
-            image(&img, transform, gl);
-        });
-
-        self.texture = Some(mem::replace(&mut img, Texture::empty(&TextureSettings::new()).unwrap()));
-    }
-
-    pub fn update(&mut self, _args: &UpdateArgs) {
-
-    }
-
-    fn create_texture(&mut self, dc: &Dc6, palette: &Palette) -> Result<Texture, Error> {
+    /*fn create_texture(&mut self, dc: &Dc6, palette: &Palette) -> Result<Texture, Error> {
 
         let frame = &dc.frames[0];
         let mut img: RgbaImage = ImageBuffer::new(frame.header.width as u32, frame.header.height as u32);
@@ -95,5 +85,5 @@ impl D2 {
         }
 
         Ok(Texture::from_image(&img, &TextureSettings::new()))
-    }
+    }*/
 }
