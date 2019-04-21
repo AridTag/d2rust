@@ -8,6 +8,7 @@ use amethyst::core::transform::TransformBundle;
 use amethyst::utils::application_root_dir;
 
 mod d2;
+mod d2assetsource;
 
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());

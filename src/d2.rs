@@ -2,6 +2,8 @@ use mpq::Archive;
 use d2fileformats::palette::Palette;
 use d2fileformats::dc6::Dc6;
 use d2fileformats::ds1::Ds1;
+use crate::d2assetsource;
+use crate::d2assetsource::D2AssetSource;
 use std::io::Error;
 use std::mem;
 use amethyst::assets::{AssetStorage, Loader};
@@ -20,7 +22,15 @@ pub const CAMERA_HEIGHT: f32 = 600.0;
 
 impl SimpleState for D2 {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
-        let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
+        {
+            let mut loader = data.world.write_resource::<Loader>();
+            let mut mpq_source = D2AssetSource::new("D:\\Diablo II");
+            mpq_source.add_mpq("d2data.mpq").expect("whoa");
+            mpq_source.add_mpq("d2exp.mpq").expect("whoa");
+            loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
+        }
+
+        /*let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
 
         let file = archive.open_file("data\\global\\palette\\loading\\pal.dat").expect("where's the palette bro?");
         let mut buf: Vec<u8> = vec![0; file.size() as usize];
@@ -29,7 +39,7 @@ impl SimpleState for D2 {
         file.read(&mut archive, &mut buf).expect("Failed to read palette bytes?");
         file2.read(&mut archive, &mut buf2).expect("Failed to read dc6 bytes?");
         let palette = Palette::from(&buf[..]).expect("failed to load palette");
-        let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");
+        let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");*/
         //println!("Frames: {}", loading_screen.header.frames);
 
         /*let texture = match self.create_texture(&loading_screen, &palette) {
@@ -39,8 +49,8 @@ impl SimpleState for D2 {
 
         //self.texture = Some(texture);
 
-        let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
-        let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");
+        /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
+        let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");*/
 
         let world = data.world;
         init_camera(world);
