@@ -1,27 +1,46 @@
-extern crate glutin_window;
-extern crate graphics;
-extern crate opengl_graphics;
-extern crate piston;
 extern crate mpq;
-extern crate image;
-extern crate vecmath;
+extern crate amethyst;
 
-use glutin_window::GlutinWindow as Window;
-use opengl_graphics::OpenGL;
-use piston::event_loop::*;
-use piston::input::*;
-use piston::window::WindowSettings;
 use crate::d2::D2;
+use amethyst::prelude::*;
+use amethyst::assets::{ProgressCounter,Processor};
+use amethyst::renderer::{DisplayConfig, DrawFlat2D, Event, Pipeline, RenderBundle, Stage, VirtualKeyCode};
+use amethyst::core::transform::TransformBundle;
+use amethyst::utils::application_root_dir;
+use crate::dc6_format::Dc6Asset;
 
 mod d2;
+mod d2assetsource;
+mod dc6_format;
 
-fn main() {
-    let opengl = OpenGL::V3_2;
-    let mut window: Window = WindowSettings::new("", [800, 600]).opengl(opengl)
-                                                                         .exit_on_esc(true)
-                                                                         .build()
-                                                                         .unwrap();
-    let mut d2 = D2::new(opengl);
+fn main() -> amethyst::Result<()> {
+    amethyst::start_logger(Default::default());
+    let config_path = format!("{}/resources/display_config.ron", application_root_dir());
+    let display_config = DisplayConfig::load(&config_path);
+
+    let pipe = Pipeline::build()
+        .with_stage(
+            Stage::with_backbuffer()
+                .clear_target([100.0 / 255.0, 149.0 / 255.0, 237.0 / 255.0, 1.0], 1.0)
+                .with_pass(DrawFlat2D::new()),
+        );
+
+    let game_data = GameDataBuilder::default()
+        .with_bundle(
+            RenderBundle::new(pipe, Some(display_config))
+                .with_sprite_sheet_processor()
+        )?
+        .with_bundle(TransformBundle::new())?
+        .with(Processor::<Dc6Asset>::new(), "", &[]);
+
+    let mut game = Application::new("./", D2 {
+        progress_counter: ProgressCounter::new(),
+        dc6_handle: None,
+    }, game_data)?;
+
+    game.run();
+
+    /*let mut d2 = D2::new(opengl);
     d2.init();
     let mut events = Events::new(EventSettings::new());
     while let Some(e) = events.next(&mut window) {
@@ -32,7 +51,9 @@ fn main() {
         if let Some(u) = e.update_args() {
             d2.update(&u)
         }
-    }
+    }*/
+
+    Ok(())
 }
 
 #[cfg(test)]

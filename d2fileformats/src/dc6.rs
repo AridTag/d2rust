@@ -1,8 +1,10 @@
 use std::io::{Error, Cursor, Seek, SeekFrom};
 use byteorder::{ReadBytesExt, LittleEndian};
 use ndarray::prelude::*;
+use std::fmt::{Debug, Formatter};
 
 /// Defines the header of a Dc6 image
+#[derive(Clone)]
 pub struct Dc6Header {
     /// Version of the file format (always 6)
     pub version: u32,
@@ -41,6 +43,7 @@ impl Dc6Header {
     }
 }
 
+#[derive(Clone)]
 pub struct Dc6 {
     pub header: Dc6Header,
     pub frames: Vec<Dc6Frame>,
@@ -77,6 +80,20 @@ impl Dc6 {
     }
 }
 
+impl Debug for Dc6 {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "\n")?;
+        write!(f, "version       : {}\n", self.header.version)?;
+        write!(f, "frames        : {}x{}\n", self.header.frames, self.header.directions)?;
+        write!(f, "encoding      : {}\n", self.header.encoding)?;
+        write!(f, "flags         : {}\n", self.header.flags)?;
+        write!(f, "termination   : {}\n", self.header.termination)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
 pub struct Dc6FrameHeader {
     /// If flipped is 0 the pixels for this frame should be (de)serialized in the appropriate order
     /// 0 = bottom right to top left
@@ -115,6 +132,7 @@ impl Dc6FrameHeader {
     }
 }
 
+#[derive(Clone)]
 pub struct Dc6Frame {
     /// The header information
     pub header: Dc6FrameHeader,
