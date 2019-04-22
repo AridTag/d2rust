@@ -7,7 +7,7 @@ pub const SOURCE_NAME: &str = "D2AssetSource";
 
 pub struct D2AssetSource {
     pub data_base_path: PathBuf,
-    pub mpq_sources: Vec<PathBuf>,
+    mpq_sources: Vec<PathBuf>,
 }
 
 impl D2AssetSource {

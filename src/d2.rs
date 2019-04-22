@@ -4,21 +4,26 @@ use d2fileformats::dc6::Dc6;
 use d2fileformats::ds1::Ds1;
 use crate::d2assetsource;
 use crate::d2assetsource::D2AssetSource;
+use crate::dc6_format::{Dc6Format, Dc6Handle, Dc6Asset};
 use std::io::Error;
 use std::mem;
 use amethyst::assets::{AssetStorage, Loader};
 use amethyst::core::transform::Transform;
 use amethyst::ecs::prelude::{Component, DenseVecStorage};
 use amethyst::prelude::*;
+use amethyst::assets::{ProgressCounter};
 use amethyst::renderer::{
     Camera, PngFormat, Projection, SpriteRender, SpriteSheet,
     SpriteSheetFormat, SpriteSheetHandle, Texture, TextureMetadata,
 };
 
-pub struct D2;
-
 pub const CAMERA_WIDTH: f32 = 800.0;
 pub const CAMERA_HEIGHT: f32 = 600.0;
+
+pub struct D2 {
+    pub progress_counter: ProgressCounter,
+    pub dc6_handle: Option<Dc6Handle>
+}
 
 impl SimpleState for D2 {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
@@ -28,6 +33,21 @@ impl SimpleState for D2 {
             mpq_source.add_mpq("d2data.mpq").expect("whoa");
             mpq_source.add_mpq("d2exp.mpq").expect("whoa");
             loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
+        }
+
+        {
+            let loader = &data.world.read_resource::<Loader>();
+
+            let dc6_handle = loader.load_from(
+                "data\\global\\ui\\loading\\loadingscreen.dc6",
+                Dc6Format,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<Dc6Asset>>(),
+            );
+
+            self.dc6_handle = Some(dc6_handle);
         }
 
         /*let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
@@ -55,6 +75,22 @@ impl SimpleState for D2 {
         let world = data.world;
         init_camera(world);
     }
+
+    fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
+        if self.progress_counter.is_complete() {
+            let dc6_assets = data.world.read_resource::<AssetStorage<Dc6Asset>>();
+            let dc6 = dc6_assets
+                .get(
+                    self.dc6_handle
+                        .as_ref()
+                        .expect("Expected handle to be set."),
+                )
+                .expect("Expected dc6 to be loaded.");
+            println!("Loaded: {:?}", dc6);
+        }
+
+        Trans::None
+    }
 }
 
 fn init_camera(world: &mut World) {
@@ -68,6 +104,11 @@ fn init_camera(world: &mut World) {
              CAMERA_HEIGHT)))
          .with(transform)
          .build();
+}
+
+fn init_dc6test(world: &mut World) {
+    let mut transform = Transform::default();
+
 }
 
 impl D2 {
