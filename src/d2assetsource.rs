@@ -1,4 +1,4 @@
-use amethyst::assets::{self, Error, Asset, AssetStorage, Source, ResultExt};
+use amethyst::assets::{self, Error, ErrorKind, Asset, AssetStorage, Source, ResultExt};
 use amethyst::utils::application_root_dir;
 use mpq::Archive;
 use std::path::{Path, PathBuf};
@@ -55,7 +55,7 @@ impl Source for D2AssetSource {
                 }
             }
 
-            return Err(assets::Error::from_kind(assets::ErrorKind::Asset(path.to_str().unwrap().to_string())));
+            return Err(assets::Error::from_kind(assets::ErrorKind::Source));
         }
 
         if path.is_relative() {
@@ -65,7 +65,7 @@ impl Source for D2AssetSource {
                 if let Ok(bytes) = std::fs::read(data_path.clone()) {
                     return Ok(bytes);
                 } else {
-                    return Err(assets::Error::from_kind(assets::ErrorKind::Asset(data_path.to_str().unwrap().to_string())));
+                    return Err(assets::Error::from_kind(assets::ErrorKind::Source));
                 }
             }
         }
@@ -79,13 +79,13 @@ impl Source for D2AssetSource {
                     // Found it
                     let mut buf = vec![0u8; file.size() as usize];
                     if let Err(_) = file.read(&mut archive, &mut buf) {
-                        return Err(assets::Error::from_kind(assets::ErrorKind::Asset(filename.clone().to_string())));
+                        return Err(assets::Error::from_kind(assets::ErrorKind::Source));
                     }
                     return Ok(buf);
                 }
             }
         }
 
-        Ok(vec![])
+        Err(assets::Error::from_kind(assets::ErrorKind::Source))
     }
 }

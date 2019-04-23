@@ -8,3 +8,4 @@ edition = "2018"
 d2fileformats = { path = "d2fileformats" }
 mpq = "0.5"
 amethyst = "0.10.0"
+serde = "1.0.90"

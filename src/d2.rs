@@ -39,7 +39,8 @@ impl SimpleState for D2 {
             let loader = &data.world.read_resource::<Loader>();
 
             let dc6_handle = loader.load_from(
-                "data\\global\\ui\\loading\\loadingscreen.dc6",
+                //"data\\global\\ui\\loading\\loadingscreen.dc6",
+                "data\\global\\items\\inv2x3.DC6",
                 Dc6Format,
                 (),
                 d2assetsource::SOURCE_NAME,
@@ -87,6 +88,7 @@ impl SimpleState for D2 {
                 )
                 .expect("Expected dc6 to be loaded.");
             println!("Loaded: {:?}", dc6);
+            return Trans::Quit;
         }
 
         Trans::None

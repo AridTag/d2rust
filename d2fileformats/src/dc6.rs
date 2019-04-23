@@ -88,7 +88,16 @@ impl Debug for Dc6 {
         write!(f, "encoding      : {}\n", self.header.encoding)?;
         write!(f, "flags         : {}\n", self.header.flags)?;
         write!(f, "termination   : {}\n", self.header.termination)?;
-
+        write!(f, "frames\n")?;
+        for frame in &self.frames {
+            write!(f, "--------------------\n")?;
+            write!(f, "    flipped : {}\n", frame.header.flipped)?;
+            write!(f, "    width   : {}\n", frame.header.width)?;
+            write!(f, "    height  : {}\n", frame.header.height)?;
+            write!(f, "    offset_x: {}\n", frame.header.offset_x)?;
+            write!(f, "    offset_y: {}\n", frame.header.offset_y)?;
+            write!(f, "    unknown : {}\n", frame.header.unknown)?;
+        }
         Ok(())
     }
 }
@@ -154,19 +163,14 @@ impl Dc6Frame {
     }
 
     fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>, Error> {
-        if frame_header.flipped == 0 {
-            return Dc6Frame::decode_pixels_bottom_top(reader, &frame_header);
-        } else {
-            unimplemented!();
-        }
-    }
-
-    fn decode_pixels_bottom_top(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>, Error> {
         const TRANSPARENT_OPCODE: u8 = 0x80;
 
         let mut pixels: Array2<u8> = Array2::zeros((frame_header.width as usize, frame_header.height as usize));
         let mut x: usize = 0;
-        let mut y: usize = (frame_header.height - 1) as usize;
+        let mut y: usize = 0;
+        if frame_header.flipped == 0 {
+            y = (frame_header.height - 1) as usize;
+        }
 
         let mut i = 0;
         while i < frame_header.length {
@@ -179,7 +183,12 @@ impl Dc6Frame {
                 }
 
                 x = 0;
-                y -= 1;
+                if frame_header.flipped == 0 {
+                    y -= 1;
+                }
+                else {
+                    y += 1;
+                }
             } else if (opcode & TRANSPARENT_OPCODE) > 0 {
                 // 0x7F transparent pixels in a row
                 x += (opcode & 0x7F) as usize;
