@@ -1,10 +1,19 @@
 use std::io::{Error, ErrorKind};
+use std::fmt::{Debug, Formatter};
 
 /// Represents a D2 palette
 #[derive(Copy, Clone)]
 pub struct Palette {
     /// The colors of this palette in BGR
     pub colors: [[u8; 3]; 256]
+}
+
+impl Debug for Palette {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "Yep it's a palette\n")?;
+
+        Ok(())
+    }
 }
 
 impl Palette {

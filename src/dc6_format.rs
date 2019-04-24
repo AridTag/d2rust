@@ -1,34 +1,11 @@
 use d2fileformats::dc6;
+use d2fileformats::dc6::Dc6;
+use crate::palette_format::{PaletteHandle, PaletteAsset};
 use amethyst::assets;
 use amethyst::assets::{Asset, SimpleFormat, Handle, ProcessingState};
+use amethyst::renderer::{Texture, TextureBuilder};
 use amethyst::ecs::prelude::VecStorage;
-use serde::{Deserialize, Serialize};
-use d2fileformats::dc6::Dc6;
 use std::cmp::max;
-
-/// Structure acting as scaffolding for serde when loading a spritesheet file.
-/// Positions originate in the top-left corner (bitmap image convention).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct SpritePosition {
-    /// Horizontal position of the sprite in the sprite sheet
-    pub x: u32,
-    /// Vertical position of the sprite in the sprite sheet
-    pub y: u32,
-    /// Width of the sprite
-    pub width: u32,
-    /// Height of the sprite
-    pub height: u32
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct SerializedSpriteSheet {
-    /// Width of the sprite sheet
-    pub spritesheet_width: u32,
-    /// Height of the sprite sheet
-    pub spritesheet_height: u32,
-    /// Description of the sprites
-    pub sprites: Vec<SpritePosition>,
-}
 
 pub type Dc6Handle = Handle<Dc6Asset>;
 
@@ -36,54 +13,56 @@ pub type Dc6Handle = Handle<Dc6Asset>;
 pub struct Dc6Asset(pub Dc6);
 
 impl Dc6Asset {
-    pub fn to_spritesheet_ron(&self) -> String {
+    /// returns the texture width, height and pixel data
+    pub fn to_texturedata(&self, palette: &PaletteAsset) -> (u32, u32, Vec<u8>) {
         let dc6 = &self.0;
 
+        let mut row_heights = vec![];
         let mut texture_width = 0;
         let mut texture_height = 0;
-        for direction in 0..dc6.header.directions {
-            let mut height = 0;
+        for row in 0..dc6.header.directions {
+            let mut row_height = 0;
             let mut row_width = 0;
             for frame_num in 0..dc6.header.frames {
-                let frame_index = ((direction * dc6.header.frames) + frame_num) as usize;
+                let frame_index = ((row * dc6.header.frames) + frame_num) as usize;
                 let frame = dc6.frames.get(frame_index).unwrap();
                 row_width += frame.header.width;
-                height = max(height, frame.header.height);
+                row_height = max(row_height, frame.header.height);
             }
             texture_width = max(texture_width, row_width);
-            texture_height += height;
+            texture_height += row_height;
+            row_heights.push(row_height);
         }
 
-        let mut sprites: Vec<SpritePosition> = vec![];
-        for direction in 0..dc6.header.directions {
-            let mut current_x = 0;
+        let mut pixel_data = vec![0u8; (texture_width * texture_height * 4) as usize];
+        let mut texture_starty: u32 = 0;
+        for row in 0..dc6.header.directions {
+            let mut texture_startx = 0;
+            if row > 0 {
+                let range = (0 as usize)..(row as usize);
+                texture_starty = row_heights[range].iter().sum();
+            }
+
             for frame_num in 0..dc6.header.frames {
-                let frame_index = ((direction * dc6.header.frames) + frame_num) as usize;
+                let frame_index = ((row * dc6.header.frames) + frame_num) as usize;
                 let frame = dc6.frames.get(frame_index).unwrap();
+                for y in 0..frame.header.height {
+                    for x in 0..frame.header.width {
+                        let palette_index = frame.pixels[(x as usize, y as usize)] as usize;
+                        let pixel_color: [u8; 3] = palette.0.colors[palette_index];
 
-                current_x += frame.header.width;
+                        let pixel_data_index = (texture_starty + texture_startx + (x * 4) + (texture_width * y)) as usize;
+                        pixel_data[pixel_data_index + 0] = pixel_color[2];
+                        pixel_data[pixel_data_index + 1] = pixel_color[1];
+                        pixel_data[pixel_data_index + 2] = pixel_color[0];
+                        pixel_data[pixel_data_index + 3] = 255;
+                    }
+                }
+                texture_startx += frame.header.width * 4;
             }
         }
 
-        /*let mut result: String = String::new();
-        result.push_str("(\n");
-        result = format!("{}\tspritesheet_width: {},\n", result, texture_width);
-        result = format!("{}\tspritesheet_height: {},\n", result, texture_height);
-        result = format!("{}\tsprites: [\n", result);
-        for direction in 0..dc6.header.directions {
-            for frame_num in 0..header.frames {
-                let frame_index = ((direction * header.frames) + frame_num) as usize;
-
-                let frame = dc6.frames.get(frame_index).unwrap();
-                result = format!("{}\t\t(\n", result);
-                result = format!("{}\t\t\tx: {}\n", result, frame.header.);
-                result = format!("{}\t\t\ty: {}\n", result, frame.header.offset_y);
-                result = format!("{}\t\t\twidth: {}\n", result, frame.header.width);
-                result = format!("{}\t\t\theight: {}\n", result, frame.header.height);
-            }
-        }*/
-
-        return String::new();
+        return (texture_width, texture_height, pixel_data);
     }
 }
 

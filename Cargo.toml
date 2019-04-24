@@ -9,3 +9,4 @@ d2fileformats = { path = "d2fileformats" }
 mpq = "0.5"
 amethyst = "0.10.0"
 serde = "1.0.90"
+ron = "0.5.1"

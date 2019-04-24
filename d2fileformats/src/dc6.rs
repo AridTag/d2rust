@@ -108,8 +108,8 @@ pub struct Dc6FrameHeader {
     /// 0 = bottom right to top left
     /// ?1 = top left to bottom right?
     pub flipped: u32,
-    pub width: i32,
-    pub height: i32,
+    pub width: u32,
+    pub height: u32,
     pub offset_x: i32,
     pub offset_y: i32,
     pub unknown: u32,
@@ -120,8 +120,8 @@ pub struct Dc6FrameHeader {
 impl Dc6FrameHeader {
     fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6FrameHeader, Error> {
         let flipped = reader.read_u32::<LittleEndian>()?;
-        let width = reader.read_i32::<LittleEndian>()?;
-        let height = reader.read_i32::<LittleEndian>()?;
+        let width = reader.read_u32::<LittleEndian>()?;
+        let height = reader.read_u32::<LittleEndian>()?;
         let offset_x = reader.read_i32::<LittleEndian>()?;
         let offset_y = reader.read_i32::<LittleEndian>()?;
         let unknown = reader.read_u32::<LittleEndian>()?;

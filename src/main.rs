@@ -1,5 +1,7 @@
 extern crate mpq;
 extern crate amethyst;
+extern crate serde;
+extern crate ron;
 
 use crate::d2::D2;
 use amethyst::prelude::*;
@@ -8,10 +10,12 @@ use amethyst::renderer::{DisplayConfig, DrawFlat2D, Event, Pipeline, RenderBundl
 use amethyst::core::transform::TransformBundle;
 use amethyst::utils::application_root_dir;
 use crate::dc6_format::Dc6Asset;
+use crate::palette_format::PaletteAsset;
 
 mod d2;
 mod d2assetsource;
 mod dc6_format;
+mod palette_format;
 
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
@@ -31,12 +35,10 @@ fn main() -> amethyst::Result<()> {
                 .with_sprite_sheet_processor()
         )?
         .with_bundle(TransformBundle::new())?
-        .with(Processor::<Dc6Asset>::new(), "", &[]);
+        .with(Processor::<Dc6Asset>::new(), "", &[])
+        .with(Processor::<PaletteAsset>::new(), "", &[]);
 
-    let mut game = Application::new("./", D2 {
-        progress_counter: ProgressCounter::new(),
-        dc6_handle: None,
-    }, game_data)?;
+    let mut game = Application::new("./", D2::new(), game_data)?;
 
     game.run();
 

@@ -5,6 +5,7 @@ use d2fileformats::ds1::Ds1;
 use crate::d2assetsource;
 use crate::d2assetsource::D2AssetSource;
 use crate::dc6_format::{Dc6Format, Dc6Handle, Dc6Asset};
+use crate::palette_format::{PaletteFormat, PaletteHandle, PaletteAsset};
 use std::io::Error;
 use std::mem;
 use amethyst::assets::{AssetStorage, Loader};
@@ -12,17 +13,19 @@ use amethyst::core::transform::Transform;
 use amethyst::ecs::prelude::{Component, DenseVecStorage};
 use amethyst::prelude::*;
 use amethyst::assets::{ProgressCounter};
-use amethyst::renderer::{
+use amethyst::renderer::{ ScreenDimensions,
     Camera, PngFormat, Projection, SpriteRender, SpriteSheet,
-    SpriteSheetFormat, SpriteSheetHandle, Texture, TextureMetadata,
+    Sprite, SpriteSheetFormat, SpriteSheetHandle, Texture, TextureHandle, TextureData, TextureMetadata,
 };
-
-pub const CAMERA_WIDTH: f32 = 800.0;
-pub const CAMERA_HEIGHT: f32 = 600.0;
 
 pub struct D2 {
     pub progress_counter: ProgressCounter,
-    pub dc6_handle: Option<Dc6Handle>
+    pub dc6_handle: Option<Dc6Handle>,
+    pub palette_handle: Option<PaletteHandle>,
+    is_initialized: bool,
+    spawned_entity: bool,
+    pub texture_handle: Option<TextureHandle>,
+    pub spritesheet_handle: Option<SpriteSheetHandle>,
 }
 
 impl SimpleState for D2 {
@@ -35,12 +38,22 @@ impl SimpleState for D2 {
             loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
         }
 
-        {
+        {;
             let loader = &data.world.read_resource::<Loader>();
 
+            let palette_handle = loader.load_from(
+                "data\\global\\palette\\loading\\pal.dat",
+                PaletteFormat,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<PaletteAsset>>()
+            );
+
+            self.palette_handle = Some(palette_handle);
+
             let dc6_handle = loader.load_from(
-                //"data\\global\\ui\\loading\\loadingscreen.dc6",
-                "data\\global\\items\\inv2x3.DC6",
+                "data\\global\\ui\\loading\\loadingscreen.dc6",
                 Dc6Format,
                 (),
                 d2assetsource::SOURCE_NAME,
@@ -78,17 +91,46 @@ impl SimpleState for D2 {
     }
 
     fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
-        if self.progress_counter.is_complete() {
+        if !self.is_initialized && self.progress_counter.is_complete() {
             let dc6_assets = data.world.read_resource::<AssetStorage<Dc6Asset>>();
-            let dc6 = dc6_assets
-                .get(
-                    self.dc6_handle
-                        .as_ref()
-                        .expect("Expected handle to be set."),
-                )
-                .expect("Expected dc6 to be loaded.");
-            println!("Loaded: {:?}", dc6);
-            return Trans::Quit;
+            let palette_assets = data.world.read_resource::<AssetStorage<PaletteAsset>>();
+            let palette = palette_assets.get(self.palette_handle.as_ref().expect("Expected handle to be set")).expect("Wheres the palette?");
+            let dc6 = dc6_assets.get(self.dc6_handle.as_ref().expect("Expected handle to be set.")).expect("Where's the dc6?");
+
+            let (texture_width, texture_height, pixel_data) = dc6.to_texturedata(&palette);
+            let loader = &data.world.read_resource::<Loader>();
+
+            let metadata = TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);
+            let texture_handle = loader.load_from_data(TextureData::U8(pixel_data, metadata),
+                                                       &mut self.progress_counter,
+                                                       &data.world.read_resource::<AssetStorage<Texture>>());
+
+            let mut sprites = vec![];
+            sprites.push(Sprite::from_pixel_values(texture_width, texture_height, 256, 256, 0, 0, [0.0, 0.0]));
+            let s = SpriteSheet {
+                texture: texture_handle.clone(),
+                sprites,
+            };
+            let spritesheet_handle = loader.load_from_data(s, &mut self.progress_counter, &data.world.read_resource::<AssetStorage<SpriteSheet>>());
+            self.texture_handle = Some(texture_handle);
+            self.spritesheet_handle = Some(spritesheet_handle);
+            self.is_initialized = true;
+
+        } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
+            let handle = self.spritesheet_handle.clone().unwrap();
+            let mut transform = Transform::default();
+            transform.set_xyz(256.0, 512.0, 0.0);
+
+            data.world.create_entity()
+                .with(transform)
+                //.with(self.texture_handle.clone().unwrap())
+                .with(SpriteRender {
+                    sprite_sheet: handle,
+                    sprite_number: 0
+                })
+                .build();
+
+            self.spawned_entity = true;
         }
 
         Trans::None
@@ -96,24 +138,36 @@ impl SimpleState for D2 {
 }
 
 fn init_camera(world: &mut World) {
+    let (width, height) = {
+        let dim = world.read_resource::<ScreenDimensions>();
+        (dim.width(), dim.height())
+    };
+
     let mut transform = Transform::default();
     transform.set_z(1.0);
     world.create_entity()
          .with(Camera::from(Projection::orthographic(
              0.0,
-             CAMERA_WIDTH,
+             width,
              0.0,
-             CAMERA_HEIGHT)))
+             height)))
          .with(transform)
          .build();
 }
 
-fn init_dc6test(world: &mut World) {
-    let mut transform = Transform::default();
-
-}
-
 impl D2 {
+
+    pub fn new() -> Self {
+        D2 {
+            progress_counter: ProgressCounter::new(),
+            palette_handle: None,
+            dc6_handle: None,
+            is_initialized: false,
+            spawned_entity: false,
+            texture_handle: None,
+            spritesheet_handle: None,
+        }
+    }
 
     fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
         let file3 = archive.open_file(filename)?;
