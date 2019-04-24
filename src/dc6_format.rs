@@ -5,7 +5,7 @@ use amethyst::assets;
 use amethyst::assets::{Asset, SimpleFormat, Handle, ProcessingState};
 use amethyst::renderer::{Texture, TextureBuilder};
 use amethyst::ecs::prelude::VecStorage;
-use std::cmp::max;
+use std::cmp::{max,min};
 
 pub type Dc6Handle = Handle<Dc6Asset>;
 
@@ -23,7 +23,7 @@ impl Dc6Asset {
         for row in 0..dc6.header.directions {
             let mut row_height = 0;
             let mut row_width = 0;
-            for frame_num in 0..dc6.header.frames {
+            for frame_num in 0..1 {//dc6.header.frames {
                 let frame_index = ((row * dc6.header.frames) + frame_num) as usize;
                 let frame = dc6.frames.get(frame_index).unwrap();
                 row_width += frame.header.width;
@@ -37,13 +37,13 @@ impl Dc6Asset {
         let mut pixel_data = vec![0u8; (texture_width * texture_height * 4) as usize];
         let mut texture_starty: u32 = 0;
         for row in 0..dc6.header.directions {
-            let mut texture_startx = 0;
             if row > 0 {
                 let range = (0 as usize)..(row as usize);
                 texture_starty = row_heights[range].iter().sum();
             }
 
-            for frame_num in 0..dc6.header.frames {
+            let mut texture_startx = 0;
+            for frame_num in 0..1 {//dc6.header.frames {
                 let frame_index = ((row * dc6.header.frames) + frame_num) as usize;
                 let frame = dc6.frames.get(frame_index).unwrap();
                 for y in 0..frame.header.height {

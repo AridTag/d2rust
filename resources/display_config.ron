@@ -1,6 +1,6 @@
 (
   title: "d2rust",
-  dimensions: Some((1024, 768)),
+  dimensions: Some((1920, 1080)),
   max_dimensions: None,
   min_dimensions: None,
   fullscreen: false,

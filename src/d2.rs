@@ -38,7 +38,7 @@ impl SimpleState for D2 {
             loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
         }
 
-        {;
+        {
             let loader = &data.world.read_resource::<Loader>();
 
             let palette_handle = loader.load_from(
@@ -123,11 +123,11 @@ impl SimpleState for D2 {
 
             data.world.create_entity()
                 .with(transform)
-                //.with(self.texture_handle.clone().unwrap())
-                .with(SpriteRender {
+                .with(self.texture_handle.clone().unwrap())
+                /*.with(SpriteRender {
                     sprite_sheet: handle,
                     sprite_number: 0
-                })
+                })*/
                 .build();
 
             self.spawned_entity = true;
