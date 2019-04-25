@@ -1,21 +1,15 @@
-use mpq::Archive;
-use d2fileformats::palette::Palette;
-use d2fileformats::dc6::Dc6;
-use d2fileformats::ds1::Ds1;
 use crate::d2assetsource;
-use crate::d2assetsource::D2AssetSource;
 use crate::dc6_format::{Dc6Format, Dc6Handle, Dc6Asset};
 use crate::palette_format::{PaletteFormat, PaletteHandle, PaletteAsset};
-use std::io::Error;
-use std::mem;
-use amethyst::assets::{AssetStorage, Loader};
-use amethyst::core::transform::Transform;
-use amethyst::ecs::prelude::{Component, DenseVecStorage};
-use amethyst::prelude::*;
-use amethyst::assets::{ProgressCounter};
-use amethyst::renderer::{ ScreenDimensions,
-    Camera, PngFormat, Projection, SpriteRender, SpriteSheet,
-    Sprite, SpriteSheetFormat, SpriteSheetHandle, Texture, TextureHandle, TextureData, TextureMetadata,
+use amethyst::{
+    prelude::*,
+    assets::{AssetStorage, Loader, ProgressCounter},
+    core::{transform::Transform, timing::Time},
+    ecs::{Entities,Read,ReadStorage,WriteStorage,join::Join},
+    renderer::{
+        ScreenDimensions, Camera, Projection, SpriteRender,
+        SpriteSheet, SpriteSheetHandle,
+        Texture, TextureHandle},
 };
 
 pub struct D2 {
@@ -24,20 +18,13 @@ pub struct D2 {
     pub palette_handle: Option<PaletteHandle>,
     is_initialized: bool,
     spawned_entity: bool,
+    last_update: f64,
     pub texture_handle: Option<TextureHandle>,
     pub spritesheet_handle: Option<SpriteSheetHandle>,
 }
 
 impl SimpleState for D2 {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
-        {
-            let mut loader = data.world.write_resource::<Loader>();
-            let mut mpq_source = D2AssetSource::new("D:\\Diablo II");
-            mpq_source.add_mpq("d2data.mpq").expect("whoa");
-            mpq_source.add_mpq("d2exp.mpq").expect("whoa");
-            loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
-        }
-
         {
             let loader = &data.world.read_resource::<Loader>();
 
@@ -64,25 +51,6 @@ impl SimpleState for D2 {
             self.dc6_handle = Some(dc6_handle);
         }
 
-        /*let mut archive = Archive::open("D:\\Diablo II\\d2data.mpq").expect("Where's the archive bro?");
-
-        let file = archive.open_file("data\\global\\palette\\loading\\pal.dat").expect("where's the palette bro?");
-        let mut buf: Vec<u8> = vec![0; file.size() as usize];
-        let file2 = archive.open_file("data\\global\\ui\\loading\\loadingscreen.dc6").expect("Where's the dc6 bro?");
-        let mut buf2 = vec![0u8; file2.size() as usize];
-        file.read(&mut archive, &mut buf).expect("Failed to read palette bytes?");
-        file2.read(&mut archive, &mut buf2).expect("Failed to read dc6 bytes?");
-        let palette = Palette::from(&buf[..]).expect("failed to load palette");
-        let loading_screen = Dc6::from(&buf2).expect("failed to load dc6");*/
-        //println!("Frames: {}", loading_screen.header.frames);
-
-        /*let texture = match self.create_texture(&loading_screen, &palette) {
-            Ok(t) => t,
-            Err(_) => panic!("eek!")
-        };*/
-
-        //self.texture = Some(texture);
-
         /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
         let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");*/
 
@@ -97,40 +65,63 @@ impl SimpleState for D2 {
             let palette = palette_assets.get(self.palette_handle.as_ref().expect("Expected handle to be set")).expect("Wheres the palette?");
             let dc6 = dc6_assets.get(self.dc6_handle.as_ref().expect("Expected handle to be set.")).expect("Where's the dc6?");
 
-            let (texture_width, texture_height, pixel_data) = dc6.to_texturedata(&palette);
             let loader = &data.world.read_resource::<Loader>();
+            let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
+            let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
 
-            let metadata = TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);
-            let texture_handle = loader.load_from_data(TextureData::U8(pixel_data, metadata),
-                                                       &mut self.progress_counter,
-                                                       &data.world.read_resource::<AssetStorage<Texture>>());
-
-            let mut sprites = vec![];
-            sprites.push(Sprite::from_pixel_values(texture_width, texture_height, 256, 256, 0, 0, [0.0, 0.0]));
-            let s = SpriteSheet {
+            let (texture_data,sprites) = dc6.to_sprites(&palette);
+            let texture_handle = loader.load_from_data(texture_data, &mut self.progress_counter, texture_storage);
+            let spritesheet = SpriteSheet {
                 texture: texture_handle.clone(),
-                sprites,
+                sprites
             };
-            let spritesheet_handle = loader.load_from_data(s, &mut self.progress_counter, &data.world.read_resource::<AssetStorage<SpriteSheet>>());
+            let spritesheet_handle = loader.load_from_data(spritesheet, &mut self.progress_counter, spritesheet_storage);
+
             self.texture_handle = Some(texture_handle);
             self.spritesheet_handle = Some(spritesheet_handle);
             self.is_initialized = true;
-
         } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
+            let (window_width, window_height) = {
+                let dim = data.world.read_resource::<ScreenDimensions>();
+                (dim.width(), dim.height())
+            };
+
             let handle = self.spritesheet_handle.clone().unwrap();
             let mut transform = Transform::default();
-            transform.set_xyz(256.0, 512.0, 0.0);
-
+            transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
             data.world.create_entity()
                 .with(transform)
-                .with(self.texture_handle.clone().unwrap())
-                /*.with(SpriteRender {
+                .with(SpriteRender {
                     sprite_sheet: handle,
                     sprite_number: 0
-                })*/
+                })
                 .build();
 
             self.spawned_entity = true;
+        } else if self.spawned_entity {
+            let StateData { world, .. } = data;
+            // Execute a pass similar to a system
+            world.exec(
+                |(entities, mut write_sprite, time): (
+                    Entities,
+                    WriteStorage<SpriteRender>,
+                    Read<Time>
+                )| {
+                    for (entity, sprite) in (&entities, &mut write_sprite).join() {
+                        if time.absolute_time_seconds() - self.last_update >= 2.0 {
+                            self.last_update = time.absolute_time_seconds();
+
+                            if sprite.sprite_number < 9 {
+                                sprite.sprite_number += 1;
+                            } else {
+                                sprite.sprite_number = 0;
+                            }
+
+                            println!("{}", sprite.sprite_number);
+                        }
+                    }
+                },
+            );
         }
 
         Trans::None
@@ -146,13 +137,13 @@ fn init_camera(world: &mut World) {
     let mut transform = Transform::default();
     transform.set_z(1.0);
     world.create_entity()
-         .with(Camera::from(Projection::orthographic(
-             0.0,
-             width,
-             0.0,
-             height)))
-         .with(transform)
-         .build();
+        .with(Camera::from(Projection::orthographic(
+            0.0,
+            width,
+            0.0,
+            height)))
+        .with(transform)
+        .build();
 }
 
 impl D2 {
@@ -164,19 +155,20 @@ impl D2 {
             dc6_handle: None,
             is_initialized: false,
             spawned_entity: false,
+            last_update: 0.0,
             texture_handle: None,
             spritesheet_handle: None,
         }
     }
 
-    fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
+    /*fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
         let file3 = archive.open_file(filename)?;
         let mut buf3 = vec![0u8; file3.size() as usize];
 
         file3.read(archive, &mut buf3)?;
 
         Ds1::from(&buf3)
-    }
+    }*/
 
     /*fn create_texture(&mut self, dc: &Dc6, palette: &Palette) -> Result<Texture, Error> {
 

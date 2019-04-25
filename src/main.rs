@@ -3,22 +3,29 @@ extern crate amethyst;
 extern crate serde;
 extern crate ron;
 
-use crate::d2::D2;
+use crate::states::InitState;
 use amethyst::prelude::*;
-use amethyst::assets::{ProgressCounter,Processor};
-use amethyst::renderer::{DisplayConfig, DrawFlat2D, Event, Pipeline, RenderBundle, Stage, VirtualKeyCode};
+use amethyst::assets::{Processor};
+use amethyst::renderer::{DisplayConfig, DrawFlat2D, Pipeline, RenderBundle, Stage};
 use amethyst::core::transform::TransformBundle;
 use amethyst::utils::application_root_dir;
 use crate::dc6_format::Dc6Asset;
 use crate::palette_format::PaletteAsset;
+use std::env;
 
 mod d2;
 mod d2assetsource;
 mod dc6_format;
 mod palette_format;
+mod states;
 
 fn main() -> amethyst::Result<()> {
+    //if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "error");//warn,gfx_device_gl=warn,amethyst_assets=warn");
+    //}
+
     amethyst::start_logger(Default::default());
+
     let config_path = format!("{}/resources/display_config.ron", application_root_dir());
     let display_config = DisplayConfig::load(&config_path);
 
@@ -38,22 +45,9 @@ fn main() -> amethyst::Result<()> {
         .with(Processor::<Dc6Asset>::new(), "", &[])
         .with(Processor::<PaletteAsset>::new(), "", &[]);
 
-    let mut game = Application::new("./", D2::new(), game_data)?;
+    let mut game = Application::new("./", InitState::new(), game_data)?;
 
     game.run();
-
-    /*let mut d2 = D2::new(opengl);
-    d2.init();
-    let mut events = Events::new(EventSettings::new());
-    while let Some(e) = events.next(&mut window) {
-        if let Some(r) = e.render_args() {
-            d2.render(&r);
-        }
-
-        if let Some(u) = e.update_args() {
-            d2.update(&u)
-        }
-    }*/
 
     Ok(())
 }
