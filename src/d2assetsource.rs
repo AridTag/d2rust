@@ -12,7 +12,7 @@ pub struct D2AssetSource {
 
 impl D2AssetSource {
     pub fn new(data_base_path: &str) -> D2AssetSource {
-        let mut path  = Path::new(data_base_path).to_path_buf();
+        let mut path = Path::new(data_base_path).to_path_buf();
         if path.is_relative() {
             path = PathBuf::from(application_root_dir()).join(path);
         }
@@ -21,7 +21,7 @@ impl D2AssetSource {
 
         D2AssetSource {
             data_base_path: path,
-            mpq_sources: vec![]
+            mpq_sources: vec![],
         }
     }
 

@@ -1,11 +1,11 @@
-use d2fileformats::palette::Palette;
 use amethyst::assets;
-use amethyst::assets::{Asset, SimpleFormat, Handle, ProcessingState};
+use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
+use d2fileformats::palette::Palette;
 
 pub type PaletteHandle = Handle<PaletteAsset>;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct PaletteAsset(pub Palette);
 
 impl Asset for PaletteAsset {
@@ -33,6 +33,8 @@ impl SimpleFormat<PaletteAsset> for PaletteFormat {
             return Ok(PaletteAsset(pal));
         }
 
-        Err(assets::Error::from_kind(assets::ErrorKind::Format("failed to read dc6")))
+        Err(assets::Error::from_kind(assets::ErrorKind::Format(
+            "failed to read dc6",
+        )))
     }
 }

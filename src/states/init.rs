@@ -1,20 +1,13 @@
-use amethyst::{
-    assets::{
-        ProgressCounter,
-        Loader,
-    },
-    SimpleState,
-    StateData,
-    GameData,
-    SimpleTrans,
-    Trans
-};
-use crate::d2assetsource::D2AssetSource;
-use crate::d2assetsource;
 use crate::d2::D2;
+use crate::d2assetsource;
+use crate::d2assetsource::D2AssetSource;
+use amethyst::{
+    assets::{Loader, ProgressCounter},
+    GameData, SimpleState, SimpleTrans, StateData, Trans,
+};
 
 pub struct InitState {
-    pub progress_counter: ProgressCounter
+    pub progress_counter: ProgressCounter,
 }
 
 impl InitState {

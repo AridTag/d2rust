@@ -1,3 +1,3 @@
-pub use self::{init::InitState};
+pub use self::init::InitState;
 
 mod init;

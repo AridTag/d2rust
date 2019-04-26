@@ -1,31 +1,51 @@
 use crate::d2assetsource;
-use crate::dc6_format::{Dc6Format, Dc6Handle, Dc6Asset};
-use crate::palette_format::{PaletteFormat, PaletteHandle, PaletteAsset};
+use crate::dc6_format::{Dc6Asset, Dc6Format, Dc6Handle};
+use crate::palette_format::{PaletteAsset, PaletteFormat, PaletteHandle};
 use amethyst::{
+    assets::{AssetStorage, Loader, ProgressCounter, Handle},
+    core::{timing::Time, transform::Transform},
+    ecs::{join::Join, Entities, Component, Read, ReadStorage, WriteStorage, DenseVecStorage},
     prelude::*,
-    assets::{AssetStorage, Loader, ProgressCounter},
-    core::{transform::Transform, timing::Time},
-    ecs::{Entities,Read,ReadStorage,WriteStorage,join::Join},
     renderer::{
-        ScreenDimensions, Camera, Projection, SpriteRender,
-        SpriteSheet, SpriteSheetHandle,
-        Texture, TextureHandle},
+        Camera, Projection, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle,
+        Texture, TextureHandle,
+    },
 };
+
+pub struct SpriteAnimationComponent {
+    pub update_rate: f64,
+    pub last_update: f64,
+}
+
+impl Component for SpriteAnimationComponent {
+    type Storage = DenseVecStorage<Self>;
+}
+
+pub struct SpriteCountComponent {
+    pub count: usize,
+}
+
+impl Component for SpriteCountComponent {
+    type Storage = DenseVecStorage<Self>;
+}
 
 pub struct D2 {
     pub progress_counter: ProgressCounter,
-    pub dc6_handle: Option<Dc6Handle>,
-    pub palette_handle: Option<PaletteHandle>,
     is_initialized: bool,
     spawned_entity: bool,
     last_update: f64,
-    pub texture_handle: Option<TextureHandle>,
-    pub spritesheet_handle: Option<SpriteSheetHandle>,
+    pub dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
+    pub handles_to_spawn: Vec<(SpriteSheetHandle, f64, Transform)>,
 }
 
 impl SimpleState for D2 {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         {
+            let (window_width, window_height) = {
+                let dim = data.world.read_resource::<ScreenDimensions>();
+                (dim.width(), dim.height())
+            };
+
             let loader = &data.world.read_resource::<Loader>();
 
             let palette_handle = loader.load_from(
@@ -34,10 +54,7 @@ impl SimpleState for D2 {
                 (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>()
-            );
-
-            self.palette_handle = Some(palette_handle);
+                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
 
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\loading\\loadingscreen.dc6",
@@ -45,10 +62,49 @@ impl SimpleState for D2 {
                 (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>(),
-            );
+                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
 
-            self.dc6_handle = Some(dc6_handle);
+            let mut transform = Transform::default();
+            transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));
+
+            let dc6_handle = loader.load_from(
+                "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
+                Dc6Format,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
+
+            let palette_handle = loader.load_from(
+                "data\\global\\palette\\Sky\\pal.dat",
+                PaletteFormat,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
+            let mut transform = Transform::default();
+            transform.set_xyz(window_width / 2.0 - 128.0, window_height / 2.0 + 256.0, 0.0);
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
+
+            let dc6_handle = loader.load_from(
+                "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
+                Dc6Format,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
+
+            let palette_handle = loader.load_from(
+                "data\\global\\palette\\Sky\\pal.dat",
+                PaletteFormat,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
+            let mut transform = Transform::default();
+            transform.set_xyz(window_width / 2.0 + 32.0, window_height / 2.0 + 256.0, 0.0);
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
         }
 
         /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
@@ -62,23 +118,32 @@ impl SimpleState for D2 {
         if !self.is_initialized && self.progress_counter.is_complete() {
             let dc6_assets = data.world.read_resource::<AssetStorage<Dc6Asset>>();
             let palette_assets = data.world.read_resource::<AssetStorage<PaletteAsset>>();
-            let palette = palette_assets.get(self.palette_handle.as_ref().expect("Expected handle to be set")).expect("Wheres the palette?");
-            let dc6 = dc6_assets.get(self.dc6_handle.as_ref().expect("Expected handle to be set.")).expect("Where's the dc6?");
 
-            let loader = &data.world.read_resource::<Loader>();
-            let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
-            let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
+            for (dc6_handle, palette_handle, update_rate, transform) in &self.dc6_palettes_to_convert {
+                let palette = palette_assets
+                    .get(&palette_handle)
+                    .expect("Wheres the palette?");
+                let dc6 = dc6_assets
+                    .get(&dc6_handle)
+                    .expect("Where's the dc6?");
 
-            let (texture_data,sprites) = dc6.to_sprites(&palette);
-            let texture_handle = loader.load_from_data(texture_data, &mut self.progress_counter, texture_storage);
-            let spritesheet = SpriteSheet {
-                texture: texture_handle.clone(),
-                sprites
-            };
-            let spritesheet_handle = loader.load_from_data(spritesheet, &mut self.progress_counter, spritesheet_storage);
+                let loader = &data.world.read_resource::<Loader>();
+                let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
+                let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
 
-            self.texture_handle = Some(texture_handle);
-            self.spritesheet_handle = Some(spritesheet_handle);
+                let (texture_data, sprites) = dc6.to_sprites(&palette);
+                let texture_handle =
+                    loader.load_from_data(texture_data, &mut self.progress_counter, texture_storage);
+                let spritesheet = SpriteSheet {
+                    texture: texture_handle.clone(),
+                    sprites,
+                };
+                let spritesheet_handle =
+                    loader.load_from_data(spritesheet, &mut self.progress_counter, spritesheet_storage);
+
+                self.handles_to_spawn.push((spritesheet_handle, *update_rate, transform.clone()));
+            }
+
             self.is_initialized = true;
         } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
             let (window_width, window_height) = {
@@ -86,38 +151,30 @@ impl SimpleState for D2 {
                 (dim.width(), dim.height())
             };
 
-            let handle = self.spritesheet_handle.clone().unwrap();
-            let mut transform = Transform::default();
-            transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
-            data.world.create_entity()
-                .with(transform)
-                .with(SpriteRender {
-                    sprite_sheet: handle,
-                    sprite_number: 0
-                })
-                .build();
+            for (spritesheet_handle, update_rate, transform) in &self.handles_to_spawn {
+                let handle: Handle<SpriteSheet> = spritesheet_handle.clone();
+                spawn_animated_dc6(data, transform.clone(), handle, *update_rate);
+            }
 
             self.spawned_entity = true;
         } else if self.spawned_entity {
             let StateData { world, .. } = data;
             // Execute a pass similar to a system
             world.exec(
-                |(entities, mut write_sprite, time): (
-                    Entities,
+                |(mut write_sprite, read_spritecount, time): (
                     WriteStorage<SpriteRender>,
-                    Read<Time>
+                    ReadStorage<SpriteCountComponent>,
+                    Read<Time>,
                 )| {
-                    for (entity, sprite) in (&entities, &mut write_sprite).join() {
-                        if time.absolute_time_seconds() - self.last_update >= 2.0 {
-                            self.last_update = time.absolute_time_seconds();
+                    if time.absolute_time_seconds() - self.last_update >= 0.4 {
+                        self.last_update = time.absolute_time_seconds();
 
-                            if sprite.sprite_number < 9 {
+                        for (sprite, sprite_count) in (&mut write_sprite, &read_spritecount).join() {
+                            if sprite.sprite_number < sprite_count.count - 1 {
                                 sprite.sprite_number += 1;
                             } else {
                                 sprite.sprite_number = 0;
                             }
-
-                            println!("{}", sprite.sprite_number);
                         }
                     }
                 },
@@ -136,28 +193,49 @@ fn init_camera(world: &mut World) {
 
     let mut transform = Transform::default();
     transform.set_z(1.0);
-    world.create_entity()
+    world
+        .create_entity()
         .with(Camera::from(Projection::orthographic(
-            0.0,
-            width,
-            0.0,
-            height)))
+            0.0, width, 0.0, height,
+        )))
         .with(transform)
         .build();
 }
 
-impl D2 {
+fn spawn_animated_dc6(data: &mut StateData<'_, GameData<'_, '_>>, transform: Transform, sprite_sheet: SpriteSheetHandle, update_rate: f64)
+{
+    let sprite_count: usize = {
+        let assets = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
+        let sheet = assets.get(&sprite_sheet).expect("This should be there");
+        sheet.sprites.len()
+    };
 
+    data.world
+        .create_entity()
+        .with(transform)
+        .with(SpriteRender {
+            sprite_sheet,
+            sprite_number: 0,
+        })
+        .with(SpriteCountComponent {
+            count: sprite_count
+        })
+        .with(SpriteAnimationComponent {
+            last_update: 0.0,
+            update_rate,
+        })
+        .build();
+}
+
+impl D2 {
     pub fn new() -> Self {
         D2 {
             progress_counter: ProgressCounter::new(),
-            palette_handle: None,
-            dc6_handle: None,
             is_initialized: false,
             spawned_entity: false,
             last_update: 0.0,
-            texture_handle: None,
-            spritesheet_handle: None,
+            dc6_palettes_to_convert: vec![],
+            handles_to_spawn: vec![],
         }
     }
 

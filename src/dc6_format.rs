@@ -1,14 +1,33 @@
-use d2fileformats::dc6::Dc6;
-use crate::palette_format::{PaletteAsset};
+use crate::palette_format::PaletteAsset;
 use amethyst::assets;
-use amethyst::assets::{Asset, SimpleFormat, Handle, ProcessingState};
-use amethyst::renderer::{TextureData, TextureMetadata, Sprite};
+use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
-use std::cmp::{max};
+use amethyst::renderer::{Sprite, TextureData, TextureMetadata};
+use d2fileformats::dc6::Dc6;
+use std::cmp::max;
+
+/// Amethyst Format for loading from '.dc6' files
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Dc6Format;
+
+impl SimpleFormat<Dc6Asset> for Dc6Format {
+    const NAME: &'static str = "DC6";
+    type Options = ();
+
+    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> assets::Result<Dc6Asset> {
+        if let Ok(dc6) = Dc6::from(&bytes) {
+            return Ok(Dc6Asset(dc6));
+        }
+
+        Err(assets::Error::from_kind(assets::ErrorKind::Format(
+            "failed to read dc6",
+        )))
+    }
+}
 
 pub type Dc6Handle = Handle<Dc6Asset>;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Dc6Asset(pub Dc6);
 
 impl Dc6Asset {
@@ -44,6 +63,7 @@ impl Dc6Asset {
             }
 
             let mut texture_startx = 0;
+            let mut sprite_start_x = 0;
             for frame_num in 0..dc6.header.frames {
                 let frame_index = ((row * dc6.header.frames) + frame_num) as usize;
                 let frame = dc6.frames.get(frame_index).unwrap();
@@ -52,27 +72,35 @@ impl Dc6Asset {
                         let palette_index = frame.pixels[(x as usize, y as usize)] as usize;
                         let pixel_color: [u8; 3] = palette.0.colors[palette_index];
 
-                        let pixel_data_index = (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
+                        let pixel_data_index =
+                            (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
                         pixel_data[pixel_data_index + 0] = pixel_color[2];
                         pixel_data[pixel_data_index + 1] = pixel_color[1];
                         pixel_data[pixel_data_index + 2] = pixel_color[0];
                         pixel_data[pixel_data_index + 3] = 255;
                     }
                 }
-                sprites.push(Sprite::from_pixel_values(texture_width,
-                                                       texture_height,
-                                                       frame.header.width,
-                                                       frame.header.height,
-                                                       texture_startx,
-                                                       texture_starty,
-                                                       [0.0,0.0]));
 
+                let sprite = Sprite::from_pixel_values(
+                    texture_width,
+                    texture_height,
+                    frame.header.width,
+                    frame.header.height,
+                    sprite_start_x,
+                    texture_starty,
+                    [0.0, 0.0],
+                );
+                sprites.push(sprite);
+
+                sprite_start_x += frame.header.width;
                 texture_startx += frame.header.width * 4;
             }
         }
 
-        let metadata = TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);
-        (TextureData::U8(pixel_data, metadata),sprites)
+        let metadata =
+            TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);
+
+        (TextureData::U8(pixel_data, metadata), sprites)
     }
 
     /// returns the texture width, height and pixel data
@@ -114,7 +142,8 @@ impl Dc6Asset {
                         let palette_index = frame.pixels[(x as usize, y as usize)] as usize;
                         let pixel_color: [u8; 3] = palette.0.colors[palette_index];
 
-                        let pixel_data_index = (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
+                        let pixel_data_index =
+                            (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
                         pixel_data[pixel_data_index + 0] = pixel_color[2];
                         pixel_data[pixel_data_index + 1] = pixel_color[1];
                         pixel_data[pixel_data_index + 2] = pixel_color[0];
@@ -138,22 +167,5 @@ impl Asset for Dc6Asset {
 impl From<Dc6Asset> for assets::Result<ProcessingState<Dc6Asset>> {
     fn from(dc6: Dc6Asset) -> assets::Result<ProcessingState<Dc6Asset>> {
         Ok(ProcessingState::Loaded(dc6))
-    }
-}
-
-/// Amethyst Format for loading from '.dc6' files
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Dc6Format;
-
-impl SimpleFormat<Dc6Asset> for Dc6Format {
-    const NAME: &'static str = "DC6";
-    type Options = ();
-
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> assets::Result<Dc6Asset> {
-        if let Ok(dc6) = Dc6::from(&bytes) {
-            return Ok(Dc6Asset(dc6));
-        }
-
-        Err(assets::Error::from_kind(assets::ErrorKind::Format("failed to read dc6")))
     }
 }
