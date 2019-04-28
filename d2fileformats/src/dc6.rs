@@ -1,7 +1,9 @@
-use std::io::{Error, Cursor, Seek, SeekFrom};
+use std::io::{Cursor, Seek, SeekFrom};
 use byteorder::{ReadBytesExt, LittleEndian};
 use ndarray::prelude::*;
 use std::fmt::{Debug, Formatter};
+use crate::errors::*;
+use error_chain::mock::ResultExt;
 
 /// Defines the header of a Dc6 image
 #[derive(Clone)]
@@ -24,7 +26,7 @@ pub struct Dc6Header {
 }
 
 impl Dc6Header {
-    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Header, Error> {
+    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Header> {
         let version = reader.read_u32::<LittleEndian>()?;
         let flags = reader.read_u32::<LittleEndian>()?;
         let encoding = reader.read_u32::<LittleEndian>()?;
@@ -50,7 +52,7 @@ pub struct Dc6 {
 }
 
 impl Dc6 {
-    pub fn from(file_bytes: &[u8]) -> Result<Dc6, Error> {
+    pub fn from(file_bytes: &[u8]) -> Result<Dc6> {
         let mut reader = Cursor::new(file_bytes);
 
         let header = Dc6Header::from(&mut reader)?;
@@ -81,7 +83,7 @@ impl Dc6 {
 }
 
 impl Debug for Dc6 {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "\n")?;
         write!(f, "version       : {}\n", self.header.version)?;
         write!(f, "frames        : {}x{}\n", self.header.frames, self.header.directions)?;
@@ -118,7 +120,7 @@ pub struct Dc6FrameHeader {
 }
 
 impl Dc6FrameHeader {
-    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6FrameHeader, Error> {
+    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6FrameHeader> {
         let flipped = reader.read_u32::<LittleEndian>()?;
         let width = reader.read_u32::<LittleEndian>()?;
         let height = reader.read_u32::<LittleEndian>()?;
@@ -152,7 +154,7 @@ pub struct Dc6Frame {
 }
 
 impl Dc6Frame {
-    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Frame, Error> {
+    fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Frame> {
         let header = Dc6FrameHeader::from(reader)?;
         let pixels: Array2<u8> = Dc6Frame::decode_pixels(reader, &header)?;
 
@@ -162,7 +164,7 @@ impl Dc6Frame {
         })
     }
 
-    fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>, Error> {
+    fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>> {
         const TRANSPARENT_OPCODE: u8 = 0x80;
 
         let mut pixels: Array2<u8> = Array2::zeros((frame_header.width as usize, frame_header.height as usize));

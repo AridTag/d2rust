@@ -1,9 +1,10 @@
-use std::io::{Error, Cursor, Seek, SeekFrom, ErrorKind};
+use std::io::{Cursor, Seek, SeekFrom, ErrorKind};
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::cmp::min;
 use std::fmt::{Debug, Formatter};
-use crate::read_string::ReadString;
 use ndarray::Array2;
+use crate::read_string::ReadString;
+use crate::errors::*;
 
 #[derive(Clone)]
 pub struct Layer<T> {
@@ -109,7 +110,7 @@ pub struct Ds1 {
 }
 
 impl Ds1 {
-    pub fn from(file_bytes: &[u8]) -> Result<Ds1, Error> {
+    pub fn from(file_bytes: &[u8]) -> Result<Ds1> {
         let mut reader = Cursor::new(file_bytes);
 
         let version = reader.read_u32::<LittleEndian>()?;
@@ -187,7 +188,7 @@ impl Ds1 {
                     if let Some(layer) = wall_layers.get_mut(layer_index) {
                         Ds1::read_wall_cells(&mut reader, layer)?;
                     } else {
-                        return Err(Error::from(ErrorKind::Other));//, format!("No wall layer at index {}. this shouldn't happen", layer_index)));
+                        bail!("No wall layer at index {}. this shouldn't happen", layer_index);
                     }
                 }
 
@@ -196,7 +197,7 @@ impl Ds1 {
                     if let Some(layer) = wall_layers.get_mut(layer_index) {
                         Ds1::read_wall_cells_orientation(&mut reader, layer, version)?;
                     } else {
-                        return Err(Error::from(ErrorKind::Other));//, "(Orientation) No wall layer at index {}. this shouldn't happen", layer_index));
+                        bail!("(Orientation) No wall layer at index {}. this shouldn't happen", layer_index);
                     }
                 }
 
@@ -205,7 +206,7 @@ impl Ds1 {
                     if let Some(layer) = floor_layers.get_mut(layer_index) {
                         Ds1::read_floor_cells(&mut reader, layer)?;
                     } else {
-                        return Err(Error::from(ErrorKind::Other));//, "No floor layer at index {}. This shouldn't happen", layer_index));
+                        bail!("No floor layer at index {}. This shouldn't happen", layer_index);
                     }
                 }
 
@@ -214,7 +215,7 @@ impl Ds1 {
                     if let Some(layer) = shadow_layers.get_mut(layer_index) {
                         Ds1::read_shadow_cells(&mut reader, layer)?;
                     } else {
-                        return Err(Error::from(ErrorKind::Other));//, "No shadow layer at index {}. This shouldn't happen", layer_index));
+                        bail!("No shadow layer at index {}. This shouldn't happen", layer_index);
                     }
                 }
 
@@ -223,12 +224,12 @@ impl Ds1 {
                     if let Some(layer) = tag_layers.get_mut(layer_index) {
                         Ds1::read_tag_cells(&mut reader, layer)?;
                     } else {
-                        return Err(Error::from(ErrorKind::Other));//, "No tag layer at index {}. This shouldn't happen", layer_index));
+                        bail!("No tag layer at index {}. This shouldn't happen", layer_index);
                     }
                 }
 
                 _ => {
-                    panic!("Unknown layer type {}", read_type)
+                    bail!("Unknown layer type {}", read_type)
                 }
             }
         }
@@ -237,7 +238,21 @@ impl Ds1 {
         let tag_groups = Ds1::read_tag_groups(&mut reader, version, tag_type)?;
 
         if Ds1::is_reader_at_end(&mut reader) {
-            // TODO: we need to return early as the file ended prematurely in tag groups
+            // we need to return early as the file ended prematurely in tag groups
+            return Ok(Ds1 {
+                version,
+                width,
+                height,
+                act,
+                tag_type,
+                file_names,
+                wall_layers,
+                floor_layers,
+                shadow_layers,
+                tag_layers,
+                objects,
+                tag_groups
+            })
         }
 
         Ds1::read_npc_paths(&mut reader, version, &mut objects)?;
@@ -269,7 +284,7 @@ impl Ds1 {
         return current_pos < end_pos;
     }
 
-    fn read_npc_paths(reader: &mut Cursor<&[u8]>, version: u32, objects: &mut Vec<Object>) -> Result<(), Error> {
+    fn read_npc_paths(reader: &mut Cursor<&[u8]>, version: u32, objects: &mut Vec<Object>) -> Result<()> {
         let npc_path_count = reader.read_u32::<LittleEndian>()?;
         for _ in 0..npc_path_count {
             let node_count = reader.read_u32::<LittleEndian>()?;
@@ -311,7 +326,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_tag_groups(reader: &mut Cursor<&[u8]>, version: u32, tag_type: u32) -> Result<Vec<TagGroup>, Error> {
+    fn read_tag_groups(reader: &mut Cursor<&[u8]>, version: u32, tag_type: u32) -> Result<Vec<TagGroup>> {
         if version < 12 || !(tag_type == 1 || tag_type == 2) {
             return Ok(vec![]);
         }
@@ -338,7 +353,7 @@ impl Ds1 {
                 }
 
                 Err(e) => {
-                    return Err(e);
+                    bail!(e);
                 }
             }
 
@@ -353,7 +368,7 @@ impl Ds1 {
                 }
 
                 Err(e) => {
-                    return Err(e);
+                    bail!(e);
                 }
             }
 
@@ -368,7 +383,7 @@ impl Ds1 {
                 }
 
                 Err(e) => {
-                    return Err(e);
+                    bail!(e);
                 }
             }
 
@@ -383,7 +398,7 @@ impl Ds1 {
                 }
 
                 Err(e) => {
-                    return Err(e);
+                    bail!(e);
                 }
             }
 
@@ -399,7 +414,7 @@ impl Ds1 {
                     }
 
                     Err(e) => {
-                        return Err(e);
+                        bail!(e);
                     }
                 }
             }
@@ -408,13 +423,13 @@ impl Ds1 {
         Ok(tag_groups)
     }
 
-    fn read_tag_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<TagCell>) -> Result<(), Error> {
+    fn read_tag_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<TagCell>) -> Result<()> {
         for y in 0..layer.height {
             for x in 0..layer.width {
                 if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut TagCell> {
                     cell.prop1 = reader.read_u32::<LittleEndian>()?;
                 } else {
-                    return Err(Error::from(ErrorKind::Other));//, "No tag cell at {},{}. This shouldn't happen", x, y));
+                    bail!("No tag cell at {},{}. This shouldn't happen", x, y);
                 }
             }
         }
@@ -422,7 +437,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_shadow_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<ShadowCell>) -> Result<(), Error> {
+    fn read_shadow_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<ShadowCell>) -> Result<()> {
         for y in 0..layer.height {
             for x in 0..layer.width {
                 if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut ShadowCell> {
@@ -431,7 +446,7 @@ impl Ds1 {
                     cell.prop3 = reader.read_u8()?;
                     cell.prop4 = reader.read_u8()?;
                 } else {
-                    return Err(Error::from(ErrorKind::Other));//, "No shadow cell at {},{}. This shouldn't happen", x, y));
+                    bail!("No shadow cell at {},{}. This shouldn't happen", x, y);
                 }
             }
         }
@@ -439,7 +454,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_floor_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<FloorCell>) -> Result<(), Error> {
+    fn read_floor_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<FloorCell>) -> Result<()> {
         for y in 0..layer.height {
             for x in 0..layer.width {
                 if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut FloorCell> {
@@ -448,7 +463,7 @@ impl Ds1 {
                     cell.prop3 = reader.read_u8()?;
                     cell.prop4 = reader.read_u8()?;
                 } else {
-                    return Err(Error::from(ErrorKind::Other));//, "No floor cell at {},{}. This shouldn't happen", x, y));
+                    bail!("No floor cell at {},{}. This shouldn't happen", x, y);
                 }
             }
         }
@@ -456,7 +471,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_wall_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>) -> Result<(), Error> {
+    fn read_wall_cells(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>) -> Result<()> {
         for y in 0..layer.height {
             for x in 0..layer.width {
                 if let Some(cell) = layer.cells.get_mut((x as usize, y as usize)) as Option<&mut WallCell> {
@@ -465,7 +480,7 @@ impl Ds1 {
                     cell.prop3 = reader.read_u8()?;
                     cell.prop4 = reader.read_u8()?;
                 } else {
-                    return Err(Error::from(ErrorKind::Other));//, "No wall cell at {},{}. This shouldn't happen", x, y))
+                    bail!("No wall cell at {},{}. This shouldn't happen", x, y);
                 }
             }
         }
@@ -473,7 +488,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_wall_cells_orientation(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>, version: u32) -> Result<(), Error> {
+    fn read_wall_cells_orientation(reader: &mut Cursor<&[u8]>, layer: &mut Layer<WallCell>, version: u32) -> Result<()> {
         let orientation_lookup: [u8; 25] = [0x00, 0x01, 0x02, 0x01, 0x02, 0x03, 0x03, 0x05, 0x05, 0x06,
             0x06, 0x07, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
             0x0F, 0x10, 0x11, 0x12, 0x14];
@@ -488,7 +503,7 @@ impl Ds1 {
                     }
                     reader.seek(SeekFrom::Current(3))?; // skip 3 bytes?
                 } else {
-                    return Err(Error::from(ErrorKind::Other));//, "(Orientation) No wall cell at {},{}. This shouldn't happen", x, y))
+                    bail!("(Orientation) No wall cell at {},{}. This shouldn't happen", x, y);
                 }
             }
         }
@@ -496,7 +511,7 @@ impl Ds1 {
         Ok(())
     }
 
-    fn read_objects(reader: &mut Cursor<&[u8]>, version: u32) -> Result<Vec<Object>, Error> {
+    fn read_objects(reader: &mut Cursor<&[u8]>, version: u32) -> Result<Vec<Object>> {
         if version < 2 {
             // No objects prior to version 2
             return Ok(vec![]);
@@ -520,7 +535,7 @@ impl Ds1 {
 }
 
 impl Debug for Ds1 {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "version       : {}\n", self.version)?;
         write!(f, "width         : {}\n", self.width)?;
         write!(f, "height        : {}\n", self.height)?;

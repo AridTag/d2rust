@@ -1,5 +1,5 @@
-use std::io::{Error, ErrorKind};
 use std::fmt::{Debug, Formatter};
+use crate::errors::*;
 
 /// Represents a D2 palette
 #[derive(Copy, Clone)]
@@ -9,7 +9,7 @@ pub struct Palette {
 }
 
 impl Debug for Palette {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "Yep it's a palette\n")?;
 
         Ok(())
@@ -18,9 +18,9 @@ impl Debug for Palette {
 
 impl Palette {
     /// Loads a Palette from the bytes of a palette file
-    pub fn from(file_bytes: &[u8]) -> Result<Palette, Error> {
+    pub fn from(file_bytes: &[u8]) -> Result<Palette> {
         if file_bytes.len() < 256 * 3 {
-            return Err(Error::new(ErrorKind::InvalidInput, "Not enough bytes to decode palette"));
+            bail!("Not enough bytes to decode palette");
         }
 
         let mut colors: [[u8; 3]; 256] = [[0,0,0]; 256];

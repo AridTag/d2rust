@@ -1,11 +1,13 @@
+use crate::errors::*;
+
 #[derive(Clone)]
 pub struct D2s {
 
 }
 
 impl D2s {
-    pub fn from(file_bytes: &[u8]) -> Result<Dc6, Error> {
-
+    pub fn from(file_bytes: &[u8]) -> Result<D2s> {
+        Ok(D2s {})
     }
 }
 
