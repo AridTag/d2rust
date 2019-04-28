@@ -1,7 +1,7 @@
+#[allow(dead_code)]
 extern crate amethyst;
+extern crate amethyst_imgui;
 extern crate mpq;
-extern crate ron;
-extern crate serde;
 
 use crate::dc6_format::Dc6Asset;
 use crate::palette_format::PaletteAsset;
@@ -11,8 +11,8 @@ use amethyst::core::transform::TransformBundle;
 use amethyst::prelude::*;
 use amethyst::renderer::{DisplayConfig, DrawFlat2D, Pipeline, RenderBundle, Stage};
 use amethyst::utils::application_root_dir;
-use std::env;
 use crate::d2::{SpriteCountComponent, SpriteAnimationComponent};
+use amethyst_imgui::{imgui};
 
 mod d2;
 mod d2assetsource;
@@ -20,16 +20,37 @@ mod dc6_format;
 mod palette_format;
 mod states;
 
-fn main() -> amethyst::Result<()> {
-    //if env::var("RUST_LOG").is_err() {
-    env::set_var("RUST_LOG", "error"); //warn,gfx_device_gl=warn,amethyst_assets=warn");
-                                       //}
+#[derive(Default, Clone, Copy)]
+pub struct ImguiUseSystem;
+impl<'s> amethyst::ecs::System<'s> for ImguiUseSystem {
+    type SystemData = ();
 
+    fn run(&mut self, _: Self::SystemData) {
+        amethyst_imgui::with(|ui| {
+            ui.window(imgui::im_str!("Hello world"))
+                .size((300.0, 100.0), imgui::ImGuiCond::FirstUseEver)
+                .build(|| {
+                    ui.text(imgui::im_str!("Hello world!"));
+                    ui.text(imgui::im_str!("こんにちは世界！"));
+                    ui.text(imgui::im_str!("This...is...imgui-rs!"));
+                    ui.separator();
+                    let mouse_pos = ui.imgui().mouse_pos();
+                    ui.text(imgui::im_str!("Mouse Position: ({:.1},{:.1})", mouse_pos.0, mouse_pos.1));
+                });
+
+            ui.show_demo_window(&mut true);
+        });
+    }
+}
+
+
+fn main() -> amethyst::Result<()> {
     let mut logconfig = amethyst::LoggerConfig::default();
     logconfig.stdout = amethyst::StdoutLog::Off;
     amethyst::start_logger(logconfig);
 
-    let config_path = format!("{}/resources/display_config.ron", application_root_dir());
+    let root_dir = application_root_dir().expect("");
+    let config_path = format!("{}/resources/display_config.ron", root_dir.to_str().unwrap());
     let display_config = DisplayConfig::load(&config_path);
 
     const BLACK: [f32;4] = [0.0, 0.0, 0.0, 1.0];
@@ -37,14 +58,20 @@ fn main() -> amethyst::Result<()> {
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target(BLACK, 1.0)
-            .with_pass(DrawFlat2D::new()),
+            .with_pass(DrawFlat2D::new())
+            .with_pass(amethyst_imgui::DrawUi::default()),
     );
 
     let game_data = GameDataBuilder::default()
-        .with_bundle(RenderBundle::new(pipe, Some(display_config)).with_sprite_sheet_processor())?
-        .with_bundle(TransformBundle::new())?
+        .with(amethyst_imgui::BeginFrame::default(), "imgui_begin", &[])
+        .with_barrier()
         .with(Processor::<Dc6Asset>::new(), "", &[])
-        .with(Processor::<PaletteAsset>::new(), "", &[]);
+        .with(Processor::<PaletteAsset>::new(), "", &[])
+        .with_bundle(TransformBundle::new())?
+        .with(ImguiUseSystem::default(), "imgui_use", &[])
+        .with_bundle(RenderBundle::new(pipe, Some(display_config)).with_sprite_sheet_processor())?
+        .with_barrier()
+        .with(amethyst_imgui::EndFrame::default(), "imgui_end", &[]);
 
     let mut game = Application::build("./", InitState::new()).unwrap()
         .register::<SpriteCountComponent>()

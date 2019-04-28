@@ -1,5 +1,5 @@
 use crate::palette_format::PaletteAsset;
-use amethyst::assets;
+use amethyst::{Result, Error};
 use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
 use amethyst::renderer::{Sprite, TextureData, TextureMetadata};
@@ -14,14 +14,12 @@ impl SimpleFormat<Dc6Asset> for Dc6Format {
     const NAME: &'static str = "DC6";
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> assets::Result<Dc6Asset> {
+    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> Result<Dc6Asset> {
         if let Ok(dc6) = Dc6::from(&bytes) {
             return Ok(Dc6Asset(dc6));
         }
 
-        Err(assets::Error::from_kind(assets::ErrorKind::Format(
-            "failed to read dc6",
-        )))
+        Err(Error::from_string("failed to read dc6"))
     }
 }
 
@@ -88,7 +86,7 @@ impl Dc6Asset {
                     frame.header.height,
                     sprite_start_x,
                     texture_starty,
-                    [0.0, 0.0],
+                    [frame.header.width as f32 / 2.0, -(frame.header.height as f32) / 2.0],
                 );
                 sprites.push(sprite);
 
@@ -164,8 +162,8 @@ impl Asset for Dc6Asset {
     type HandleStorage = VecStorage<Handle<Self>>;
 }
 
-impl From<Dc6Asset> for assets::Result<ProcessingState<Dc6Asset>> {
-    fn from(dc6: Dc6Asset) -> assets::Result<ProcessingState<Dc6Asset>> {
+impl From<Dc6Asset> for Result<ProcessingState<Dc6Asset>> {
+    fn from(dc6: Dc6Asset) -> Result<ProcessingState<Dc6Asset>> {
         Ok(ProcessingState::Loaded(dc6))
     }
 }

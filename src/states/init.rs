@@ -21,9 +21,10 @@ impl InitState {
 impl SimpleState for InitState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let mut loader = data.world.write_resource::<Loader>();
-        let mut mpq_source = D2AssetSource::new("D:\\Diablo II");
+        let mut mpq_source = D2AssetSource::new("G:\\Diablo II");
         mpq_source.add_mpq("d2data.mpq").expect("whoa");
         mpq_source.add_mpq("d2exp.mpq").expect("whoa");
+        mpq_source.add_mpq("patch_d2.mpq").expect("whoa");
         loader.add_source(d2assetsource::SOURCE_NAME, mpq_source);
     }
 

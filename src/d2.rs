@@ -2,13 +2,13 @@ use crate::d2assetsource;
 use crate::dc6_format::{Dc6Asset, Dc6Format, Dc6Handle};
 use crate::palette_format::{PaletteAsset, PaletteFormat, PaletteHandle};
 use amethyst::{
-    assets::{AssetStorage, Loader, ProgressCounter, Handle},
+    assets::{AssetStorage, Loader, ProgressCounter},
     core::{timing::Time, transform::Transform},
-    ecs::{join::Join, Entities, Component, Read, ReadStorage, WriteStorage, DenseVecStorage},
+    ecs::{join::Join, Component, Read, ReadStorage, WriteStorage, DenseVecStorage},
     prelude::*,
     renderer::{
         Camera, Projection, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle,
-        Texture, TextureHandle,
+        Texture
     },
 };
 
@@ -30,12 +30,12 @@ impl Component for SpriteCountComponent {
 }
 
 pub struct D2 {
-    pub progress_counter: ProgressCounter,
+    progress_counter: ProgressCounter,
     is_initialized: bool,
     spawned_entity: bool,
     last_update: f64,
-    pub dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
-    pub handles_to_spawn: Vec<(SpriteSheetHandle, f64, Transform)>,
+    dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
+    handles_to_spawn: Vec<(SpriteSheetHandle, f64, Transform)>,
 }
 
 impl SimpleState for D2 {
@@ -48,7 +48,7 @@ impl SimpleState for D2 {
 
             let loader = &data.world.read_resource::<Loader>();
 
-            let palette_handle = loader.load_from(
+            /*let palette_handle = loader.load_from(
                 "data\\global\\palette\\loading\\pal.dat",
                 PaletteFormat,
                 (),
@@ -65,6 +65,26 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>());
 
             let mut transform = Transform::default();
+            transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));*/
+
+            /*let dc6_handle = loader.load_from(
+                "data\\global\\ui\\frontend\\ts11b.dc6",
+                Dc6Format,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
+
+            let palette_handle = loader.load_from(
+                "data\\global\\palette\\Sky\\pal.dat",
+                PaletteFormat,
+                (),
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                &data.world.read_resource::<AssetStorage<PaletteAsset>>());*/
+
+            /*let mut transform = Transform::default();
             transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
             self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));
 
@@ -85,7 +105,7 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
             let mut transform = Transform::default();
             transform.set_xyz(window_width / 2.0 - 128.0, window_height / 2.0 + 256.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));*/
 
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
@@ -103,7 +123,7 @@ impl SimpleState for D2 {
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
             let mut transform = Transform::default();
-            transform.set_xyz(window_width / 2.0 + 32.0, window_height / 2.0 + 256.0, 0.0);
+            transform.set_translation_xyz(window_width / 2.0 + 32.0, window_height / 2.0 + 256.0, 0.0);
             self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
         }
 
@@ -127,6 +147,8 @@ impl SimpleState for D2 {
                     .get(&dc6_handle)
                     .expect("Where's the dc6?");
 
+                //println!("{:?}", dc6.0);
+
                 let loader = &data.world.read_resource::<Loader>();
                 let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
                 let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
@@ -146,14 +168,8 @@ impl SimpleState for D2 {
 
             self.is_initialized = true;
         } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
-            let (window_width, window_height) = {
-                let dim = data.world.read_resource::<ScreenDimensions>();
-                (dim.width(), dim.height())
-            };
-
             for (spritesheet_handle, update_rate, transform) in &self.handles_to_spawn {
-                let handle: Handle<SpriteSheet> = spritesheet_handle.clone();
-                spawn_animated_dc6(data, transform.clone(), handle, *update_rate);
+                spawn_animated_dc6(data, transform.clone(), spritesheet_handle.clone(), *update_rate);
             }
 
             self.spawned_entity = true;
@@ -192,7 +208,7 @@ fn init_camera(world: &mut World) {
     };
 
     let mut transform = Transform::default();
-    transform.set_z(1.0);
+    transform.set_translation_z(1.0);
     world
         .create_entity()
         .with(Camera::from(Projection::orthographic(

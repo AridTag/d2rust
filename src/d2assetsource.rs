@@ -1,4 +1,5 @@
-use amethyst::assets::{self, Source};
+use amethyst::assets::Source;
+use amethyst::{Result, Error};
 use amethyst::utils::application_root_dir;
 use mpq::Archive;
 use std::path::{Path, PathBuf};
@@ -14,7 +15,7 @@ impl D2AssetSource {
     pub fn new(data_base_path: &str) -> D2AssetSource {
         let mut path = Path::new(data_base_path).to_path_buf();
         if path.is_relative() {
-            path = PathBuf::from(application_root_dir()).join(path);
+            path = application_root_dir().unwrap().join(path);
         }
 
         // TODO: Should return an error if the path doesn't exist
@@ -42,11 +43,11 @@ impl D2AssetSource {
 }
 
 impl Source for D2AssetSource {
-    fn modified(&self, _path: &str) -> assets::Result<u64> {
+    fn modified(&self, _path: &str) -> Result<u64> {
         Ok(0)
     }
 
-    fn load(&self, path_: &str) -> assets::Result<Vec<u8>> {
+    fn load(&self, path_: &str) -> Result<Vec<u8>> {
         let path = Path::new(path_);
         if path.is_absolute() {
             if path.exists() {
@@ -55,7 +56,7 @@ impl Source for D2AssetSource {
                 }
             }
 
-            return Err(assets::Error::from_kind(assets::ErrorKind::Source));
+            return Err(Error::from_string("Absolute path not found"));
         }
 
         if path.is_relative() {
@@ -65,7 +66,7 @@ impl Source for D2AssetSource {
                 if let Ok(bytes) = std::fs::read(data_path.clone()) {
                     return Ok(bytes);
                 } else {
-                    return Err(assets::Error::from_kind(assets::ErrorKind::Source));
+                    return Err(Error::from_string("Relative path not found"));
                 }
             }
         }
@@ -79,13 +80,13 @@ impl Source for D2AssetSource {
                     // Found it
                     let mut buf = vec![0u8; file.size() as usize];
                     if let Err(_) = file.read(&mut archive, &mut buf) {
-                        return Err(assets::Error::from_kind(assets::ErrorKind::Source));
+                        return Err(Error::from_string("Failed to read file from mpq"));
                     }
                     return Ok(buf);
                 }
             }
         }
 
-        Err(assets::Error::from_kind(assets::ErrorKind::Source))
+        Err(Error::from_string("File not found"))
     }
 }

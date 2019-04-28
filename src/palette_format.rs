@@ -1,4 +1,4 @@
-use amethyst::assets;
+use amethyst::{Result, Error};
 use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
 use d2fileformats::palette::Palette;
@@ -14,8 +14,8 @@ impl Asset for PaletteAsset {
     type HandleStorage = VecStorage<Handle<Self>>;
 }
 
-impl From<PaletteAsset> for assets::Result<ProcessingState<PaletteAsset>> {
-    fn from(palette: PaletteAsset) -> assets::Result<ProcessingState<PaletteAsset>> {
+impl From<PaletteAsset> for Result<ProcessingState<PaletteAsset>> {
+    fn from(palette: PaletteAsset) -> Result<ProcessingState<PaletteAsset>> {
         Ok(ProcessingState::Loaded(palette))
     }
 }
@@ -28,13 +28,11 @@ impl SimpleFormat<PaletteAsset> for PaletteFormat {
     const NAME: &'static str = "Palette";
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> assets::Result<PaletteAsset> {
+    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> Result<PaletteAsset> {
         if let Ok(pal) = Palette::from(&bytes) {
             return Ok(PaletteAsset(pal));
         }
 
-        Err(assets::Error::from_kind(assets::ErrorKind::Format(
-            "failed to read dc6",
-        )))
+        Err(Error::from_string("failed to read dc6"))
     }
 }
