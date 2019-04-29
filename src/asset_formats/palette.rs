@@ -1,6 +1,6 @@
-use amethyst::{Result, Error};
 use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
+use amethyst::{Error, Result};
 use d2fileformats::palette::Palette;
 
 pub type PaletteHandle = Handle<PaletteAsset>;

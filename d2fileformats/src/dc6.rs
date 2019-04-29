@@ -3,7 +3,6 @@ use byteorder::{ReadBytesExt, LittleEndian};
 use ndarray::prelude::*;
 use std::fmt::{Debug, Formatter};
 use crate::errors::*;
-use error_chain::mock::ResultExt;
 
 /// Defines the header of a Dc6 image
 #[derive(Clone)]

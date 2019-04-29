@@ -1,8 +1,8 @@
-use crate::palette_format::PaletteAsset;
-use amethyst::{Result, Error};
+use crate::asset_formats::PaletteAsset;
 use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
 use amethyst::ecs::prelude::VecStorage;
 use amethyst::renderer::{Sprite, TextureData, TextureMetadata};
+use amethyst::{Error, Result};
 use d2fileformats::dc6::Dc6;
 use std::cmp::max;
 
@@ -86,7 +86,10 @@ impl Dc6Asset {
                     frame.header.height,
                     sprite_start_x,
                     texture_starty,
-                    [frame.header.width as f32 / 2.0, -(frame.header.height as f32) / 2.0],
+                    [
+                        frame.header.width as f32 / 2.0,
+                        -(frame.header.height as f32) / 2.0,
+                    ],
                 );
                 sprites.push(sprite);
 

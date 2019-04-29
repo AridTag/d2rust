@@ -2,6 +2,7 @@ use std::io::{Read, Error};
 
 pub trait ReadString {
     fn read_zstring(&mut self) -> Result<String, Error>;
+    fn read_bytes(&mut self, n: usize) -> Result<Vec<u8>, Error>;
 }
 
 impl <T: Read> ReadString for T {
@@ -17,6 +18,15 @@ impl <T: Read> ReadString for T {
 
             buf.push(current[0] as char);
         }
+
+        Ok(buf)
+    }
+
+    #[inline(always)]
+    fn read_bytes(&mut self, n: usize) -> Result<Vec<u8>, Error> {
+        let mut buf = Vec::with_capacity(n);
+        unsafe { buf.set_len(n); }
+        self.read(&mut buf[..])?;
 
         Ok(buf)
     }

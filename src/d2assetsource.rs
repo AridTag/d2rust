@@ -1,6 +1,6 @@
 use amethyst::assets::Source;
-use amethyst::{Result, Error};
 use amethyst::utils::application_root_dir;
+use amethyst::{Error, Result};
 use mpq::Archive;
 use std::path::{Path, PathBuf};
 

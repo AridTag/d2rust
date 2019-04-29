@@ -21,6 +21,7 @@ mod errors {
 
         foreign_links {
             Io(std::io::Error);
+            Utf8(std::str::Utf8Error);
         }
     }
 }
