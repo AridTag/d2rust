@@ -4,13 +4,14 @@ use crate::asset_formats::{
 };
 use crate::d2assetsource;
 use amethyst::{
-    assets::{AssetStorage, Loader, ProgressCounter},
+    assets::{Handle, AssetStorage, Loader, ProgressCounter},
     core::{timing::Time, transform::Transform},
     ecs::{join::Join, Component, DenseVecStorage, Read, ReadStorage, WriteStorage},
     prelude::*,
     renderer::{
-        Camera, Projection, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle, Texture,
+        Camera, SpriteRender, SpriteSheet, Texture
     },
+    window::ScreenDimensions
 };
 
 pub struct SpriteAnimationComponent {
@@ -36,7 +37,7 @@ pub struct D2 {
     spawned_entity: bool,
     last_update: f64,
     dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
-    handles_to_spawn: Vec<(SpriteSheetHandle, f64, Transform)>,
+    handles_to_spawn: Vec<(Handle<SpriteSheet>, f64, Transform)>,
 }
 
 impl SimpleState for D2 {
@@ -52,7 +53,6 @@ impl SimpleState for D2 {
             let d2s_handle = loader.load_from(
                 "C:\\Users\\jon\\Saved Games\\Diablo II\\Ass.d2s",
                 D2sFormat,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<D2sAsset>>(),
@@ -61,7 +61,6 @@ impl SimpleState for D2 {
             /*let palette_handle = loader.load_from(
                 "data\\global\\palette\\loading\\pal.dat",
                 PaletteFormat,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
@@ -69,7 +68,6 @@ impl SimpleState for D2 {
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\loading\\loadingscreen.dc6",
                 Dc6Format,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>());
@@ -81,7 +79,6 @@ impl SimpleState for D2 {
             /*let dc6_handle = loader.load_from(
                 "data\\global\\ui\\frontend\\ts11b.dc6",
                 Dc6Format,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>());
@@ -89,7 +86,6 @@ impl SimpleState for D2 {
             let palette_handle = loader.load_from(
                 "data\\global\\palette\\Sky\\pal.dat",
                 PaletteFormat,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());*/
@@ -101,7 +97,6 @@ impl SimpleState for D2 {
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
                 Dc6Format,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>());
@@ -109,7 +104,6 @@ impl SimpleState for D2 {
             let palette_handle = loader.load_from(
                 "data\\global\\palette\\Sky\\pal.dat",
                 PaletteFormat,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
@@ -120,7 +114,6 @@ impl SimpleState for D2 {
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
                 Dc6Format,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>(),
@@ -129,7 +122,6 @@ impl SimpleState for D2 {
             let palette_handle = loader.load_from(
                 "data\\global\\palette\\Sky\\pal.dat",
                 PaletteFormat,
-                (),
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>(),
@@ -242,9 +234,7 @@ fn init_camera(world: &mut World) {
     transform.set_translation_z(1.0);
     world
         .create_entity()
-        .with(Camera::from(Projection::orthographic(
-            0.0, width, 0.0, height,
-        )))
+        .with(Camera::standard_2d(width, height))
         .with(transform)
         .build();
 }
@@ -252,7 +242,7 @@ fn init_camera(world: &mut World) {
 fn spawn_animated_dc6(
     data: &mut StateData<'_, GameData<'_, '_>>,
     transform: Transform,
-    sprite_sheet: SpriteSheetHandle,
+    sprite_sheet: Handle<SpriteSheet>,
     update_rate: f64,
 ) {
     let sprite_count: usize = {

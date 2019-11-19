@@ -5,6 +5,7 @@ use amethyst::{
     assets::{Loader, ProgressCounter},
     GameData, SimpleState, SimpleTrans, StateData, Trans,
 };
+use amethyst::prelude::WorldExt;
 
 pub struct InitState {
     pub progress_counter: ProgressCounter,

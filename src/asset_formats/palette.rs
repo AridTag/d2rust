@@ -1,4 +1,4 @@
-use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
+use amethyst::assets::{Asset, Handle, ProcessingState, Format};
 use amethyst::ecs::prelude::VecStorage;
 use amethyst::{Error, Result};
 use d2fileformats::palette::Palette;
@@ -24,11 +24,12 @@ impl From<PaletteAsset> for Result<ProcessingState<PaletteAsset>> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PaletteFormat;
 
-impl SimpleFormat<PaletteAsset> for PaletteFormat {
-    const NAME: &'static str = "Palette";
-    type Options = ();
+impl Format<PaletteAsset> for PaletteFormat {
+    fn name(&self) -> &'static str {
+        "Palette"
+    }
 
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> Result<PaletteAsset> {
+    fn import_simple(&self, bytes: Vec<u8>) -> Result<PaletteAsset> {
         if let Ok(pal) = Palette::from(&bytes) {
             return Ok(PaletteAsset(pal));
         }

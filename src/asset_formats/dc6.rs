@@ -1,7 +1,7 @@
 use crate::asset_formats::PaletteAsset;
-use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
+use amethyst::assets::{Asset, Handle, ProcessingState, Format};
 use amethyst::ecs::prelude::VecStorage;
-use amethyst::renderer::{Sprite, TextureData, TextureMetadata};
+use amethyst::renderer::{Sprite, types::TextureData, loaders::load_from_srgba, palette::Srgba};
 use amethyst::{Error, Result};
 use d2fileformats::dc6::Dc6;
 use std::cmp::max;
@@ -10,11 +10,12 @@ use std::cmp::max;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dc6Format;
 
-impl SimpleFormat<Dc6Asset> for Dc6Format {
-    const NAME: &'static str = "DC6";
-    type Options = ();
+impl Format<Dc6Asset> for Dc6Format {
+    fn name(&self) -> &'static str {
+        "DC6"
+    }
 
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> Result<Dc6Asset> {
+    fn import_simple(&self, bytes: Vec<u8>) -> Result<Dc6Asset> {
         if let Ok(dc6) = Dc6::from(&bytes) {
             return Ok(Dc6Asset(dc6));
         }
@@ -90,6 +91,8 @@ impl Dc6Asset {
                         frame.header.width as f32 / 2.0,
                         -(frame.header.height as f32) / 2.0,
                     ],
+                    false,
+                    false
                 );
                 sprites.push(sprite);
 
@@ -98,10 +101,14 @@ impl Dc6Asset {
             }
         }
 
-        let metadata =
-            TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);
+        /*let metadata =
+            TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);*/
 
-        (TextureData::U8(pixel_data, metadata), sprites)
+        let mut textureBuilder = load_from_srgba(Srgba::new(0., 0., 0., 0.));
+        textureBuilder.set_data_width(texture_width);
+        textureBuilder.set_data_height(texture_height);
+
+        return (TextureData::from(textureBuilder), sprites)
     }
 
     /// returns the texture width, height and pixel data

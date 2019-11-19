@@ -8,10 +8,17 @@ use crate::d2::{SpriteAnimationComponent, SpriteCountComponent};
 use crate::states::InitState;
 use amethyst::assets::Processor;
 use amethyst::core::transform::TransformBundle;
+use amethyst::renderer::{
+    plugins::{RenderToWindow},
+    types::DefaultBackend,
+    RenderingBundle
+};
+use amethyst::{
+    input::{InputBundle, StringBindings},
+};
 use amethyst::prelude::*;
-use amethyst::renderer::{DisplayConfig, DrawFlat2D, Pipeline, RenderBundle, Stage};
 use amethyst::utils::application_root_dir;
-use amethyst_imgui::imgui;
+use amethyst_imgui::RenderImgui;
 
 mod asset_formats;
 mod d2;
@@ -25,7 +32,7 @@ impl<'s> amethyst::ecs::System<'s> for ImguiUseSystem {
 
     fn run(&mut self, _: Self::SystemData) {
         amethyst_imgui::with(|ui| {
-            ui.window(imgui::im_str!("Hello world"))
+            /*ui.window(imgui::im_str!("Hello world"))
                 .size((300.0, 100.0), imgui::ImGuiCond::FirstUseEver)
                 .build(|| {
                     ui.text(imgui::im_str!("Hello world!"));
@@ -38,7 +45,7 @@ impl<'s> amethyst::ecs::System<'s> for ImguiUseSystem {
                         mouse_pos.0,
                         mouse_pos.1
                     ));
-                });
+                });*/
 
             ui.show_demo_window(&mut true);
         });
@@ -51,32 +58,29 @@ fn main() -> amethyst::Result<()> {
     amethyst::start_logger(logconfig);
 
     let root_dir = application_root_dir().expect("");
-    let config_path = format!(
+    let display_config_path = format!(
         "{}/resources/display_config.ron",
         root_dir.to_str().unwrap()
     );
-    let display_config = DisplayConfig::load(&config_path);
 
     const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
     const CORNFLOWER_BLUE: [f32; 4] = [100.0 / 255.0, 149.0 / 255.0, 237.0 / 255.0, 1.0];
-    let pipe = Pipeline::build().with_stage(
-        Stage::with_backbuffer()
-            .clear_target(BLACK, 1.0)
-            .with_pass(DrawFlat2D::new())
-            .with_pass(amethyst_imgui::DrawUi::default()),
-    );
 
     let game_data = GameDataBuilder::default()
-        .with(amethyst_imgui::BeginFrame::default(), "imgui_begin", &[])
         .with_barrier()
         .with(Processor::<Dc6Asset>::new(), "", &[])
         .with(Processor::<PaletteAsset>::new(), "", &[])
         .with(Processor::<D2sAsset>::new(), "", &[])
         .with_bundle(TransformBundle::new())?
         .with(ImguiUseSystem::default(), "imgui_use", &[])
-        .with_bundle(RenderBundle::new(pipe, Some(display_config)).with_sprite_sheet_processor())?
-        .with_barrier()
-        .with(amethyst_imgui::EndFrame::default(), "imgui_end", &[]);
+        .with_bundle(InputBundle::<StringBindings>::default())?
+        .with_bundle(
+            RenderingBundle::<DefaultBackend>::new()
+                .with_plugin(RenderToWindow::from_config_path(display_config_path).with_clear(CORNFLOWER_BLUE))
+                .with_plugin(RenderImgui::<StringBindings>::default()),
+        )?;
+
+
 
     let mut game = Application::build("./", InitState::new())
         .unwrap()

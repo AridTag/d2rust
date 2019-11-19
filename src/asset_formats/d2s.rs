@@ -1,4 +1,4 @@
-use amethyst::assets::{Asset, Handle, ProcessingState, SimpleFormat};
+use amethyst::assets::{Asset, Handle, ProcessingState, Format};
 use amethyst::ecs::prelude::VecStorage;
 use amethyst::{Error, Result};
 use d2fileformats::d2s::*;
@@ -24,11 +24,12 @@ impl From<D2sAsset> for Result<ProcessingState<D2sAsset>> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct D2sFormat;
 
-impl SimpleFormat<D2sAsset> for D2sFormat {
-    const NAME: &'static str = "D2s";
-    type Options = ();
+impl Format<D2sAsset> for D2sFormat {
+    fn name(&self) -> &'static str {
+        "D2s"
+    }
 
-    fn import(&self, bytes: Vec<u8>, _: Self::Options) -> Result<D2sAsset> {
+    fn import_simple(&self, bytes: Vec<u8>) -> Result<D2sAsset> {
         if let Ok(d2s) = D2s::from(&bytes) {
             return Ok(D2sAsset(d2s));
         }
