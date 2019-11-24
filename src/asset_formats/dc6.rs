@@ -1,7 +1,12 @@
 use crate::asset_formats::PaletteAsset;
 use amethyst::assets::{Asset, Handle, ProcessingState, Format};
 use amethyst::ecs::prelude::VecStorage;
-use amethyst::renderer::{Sprite, types::TextureData, loaders::load_from_srgba, palette::Srgba};
+use amethyst::renderer::{
+    Sprite, types::TextureData, loaders::load_from_srgba, palette::Srgba, rendy::texture::TextureBuilder, rendy::texture::image::TextureKind,
+    rendy::hal::image::{
+        Kind, ViewKind, SamplerInfo, WrapMode, Filter, Anisotropic, PackedColor
+    }
+};
 use amethyst::{Error, Result};
 use d2fileformats::dc6::Dc6;
 use std::cmp::max;
@@ -104,11 +109,30 @@ impl Dc6Asset {
         /*let metadata =
             TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);*/
 
-        let mut textureBuilder = load_from_srgba(Srgba::new(0., 0., 0., 0.));
-        textureBuilder.set_data_width(texture_width);
-        textureBuilder.set_data_height(texture_height);
+        /*let mut texture_builder = load_from_srgba(Srgba::new(0., 0., 0., 0.));
+        texture_builder.set_data_width(texture_width);
+        texture_builder.set_data_height(texture_height);*/
+        let texture_builder = TextureBuilder::new()
+            .with_data_width(texture_width)
+            .with_data_height(texture_height)
+            .with_kind(Kind::D2(texture_width, texture_height, 1, 1))
+            .with_view_kind(ViewKind::D2)
+            .with_sampler_info(SamplerInfo {
+                min_filter: Filter::Linear,
+                mag_filter: Filter::Linear,
+                mip_filter: Filter::Linear,
+                wrap_mode: (WrapMode::Clamp, WrapMode::Clamp, WrapMode::Clamp),
+                lod_bias: 0.0.into(),
+                lod_range: std::ops::Range {
+                    start: 0.0.into(),
+                    end: 1000.0.into(),
+                },
+                comparison: None,
+                border: PackedColor(0),
+                anisotropic: Anisotropic::Off,
+            }).with_raw_data(pixel_data, amethyst::renderer::Format::Rgba8Unorm);
 
-        return (TextureData::from(textureBuilder), sprites)
+        return (TextureData::from(texture_builder), sprites)
     }
 
     /// returns the texture width, height and pixel data

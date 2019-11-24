@@ -49,6 +49,7 @@ pub struct D2s {
     pub mercenary_type: u16,
     pub mercenary_exp: u32,
     pub unknown8: [u8;144],
+    pub quests: QuestStatus,
 }
 
 impl Default for D2s {
@@ -85,6 +86,7 @@ impl Default for D2s {
             mercenary_type: 0,
             mercenary_exp: 0,
             unknown8: [0u8; 144],
+            quests: Default::default(),
         }
     }
 }
@@ -171,16 +173,16 @@ impl D2s {
                     mercenary_type,
                     mercenary_exp,
                     unknown8,
-                    ..Default::default()
+                    quests: Default::default()
                 };
 
-            println!("{:?}", result);
+            //println!("{:?}", result);
 
             return Ok(result);
         }
 
          // TODO: more reading
-
+        let quests = QuestStatus::from(&mut reader)?;
 
         let result = D2s
             {
@@ -215,7 +217,7 @@ impl D2s {
                 mercenary_type,
                 mercenary_exp,
                 unknown8,
-                ..Default::default()
+                quests,
             };
 
         println!("{:?}", result);
@@ -262,6 +264,7 @@ impl Debug for D2s {
         writeln!(f, "mercenary_name   : {}", self.mercenary_name_index)?;
         writeln!(f, "mercenary_type   : {:#06X}", self.mercenary_type)?;
         writeln!(f, "mercenary_exp    : {}", self.mercenary_exp)?;
+        write!(f, "{:?}", self.quests)?;
 
         Ok(())
     }
@@ -402,65 +405,287 @@ impl CharacterMenuAppearance {
 
 #[derive(Clone)]
 pub struct QuestStatus {
+    pub identifier: [u8;4],
+    pub unknown: [u8;6],
+    pub normal: DifficultyQuestGroup,
+    pub nightmare: DifficultyQuestGroup,
+    pub hell: DifficultyQuestGroup,
+}
+
+impl QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<QuestStatus> {
+        let mut identifier = [0u8;4];
+        for b in &mut identifier {
+            *b = reader.read_u8()?;
+        }
+
+        let mut unknown = [0u8;6];
+        for b in &mut unknown {
+            *b = reader.read_u8()?;
+        }
+
+        let normal = DifficultyQuestGroup::from(reader)?;
+        let nightmare = DifficultyQuestGroup::from(reader)?;
+        let hell = DifficultyQuestGroup::from(reader)?;
+
+        Ok(QuestStatus {
+            identifier,
+            unknown,
+            normal,
+            nightmare,
+            hell
+        })
+    }
+}
+
+impl Default for QuestStatus {
+    fn default() -> Self {
+        QuestStatus {
+            identifier: ['W' as u8, 'o' as u8, 'o' as u8, '!' as u8],
+            unknown: [0u8;6],
+            normal: Default::default(),
+            nightmare: Default::default(),
+            hell: Default::default(),
+        }
+    }
+}
+
+impl Debug for QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "quest data")?;
+        writeln!(f, "  normal")?;
+        write!(f, "{:?}", self.normal)?;
+        writeln!(f, "  nightmare")?;
+        write!(f, "{:?}", self.nightmare)?;
+        writeln!(f, "  hell")?;
+        write!(f, "{:?}", self.hell)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone,Default)]
+pub struct DifficultyQuestGroup {
     pub act_1: Act1QuestStatus,
     pub act_2: Act2QuestStatus,
     pub act_3: Act3QuestStatus,
     pub act_4: Act4QuestStatus,
     pub act_5: Act5QuestStatus,
-    pub reserved: [u8;10],
+    pub reserved: [u16;7],
+}
+
+impl DifficultyQuestGroup {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<DifficultyQuestGroup> {
+        let act_1 = Act1QuestStatus::from(reader)?;
+        let act_2 = Act2QuestStatus::from(reader)?;
+        let act_3 = Act3QuestStatus::from(reader)?;
+        let act_4 = Act4QuestStatus::from(reader)?;
+        let act_5 = Act5QuestStatus::from(reader)?;
+
+        let mut reserved = [0u16; 7];
+        for b in &mut reserved {
+            *b = reader.read_u16::<LittleEndian>()?;
+        }
+
+        Ok(DifficultyQuestGroup {
+            act_1,
+            act_2,
+            act_3,
+            act_4,
+            act_5,
+            reserved
+        })
+    }
+}
+
+impl Debug for DifficultyQuestGroup {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.act_1)?;
+        write!(f, "{:?}", self.act_2)?;
+        write!(f, "{:?}", self.act_3)?;
+        write!(f, "{:?}", self.act_4)?;
+        write!(f, "{:?}", self.act_5)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone,Default)]
 pub struct Act1QuestStatus {
-    pub enable_a: u16,
-    pub enable_b: u16,
+    pub introduced: u16,
     pub quest_1: u16,
     pub quest_2: u16,
     pub quest_3: u16,
     pub quest_4: u16,
     pub quest_5: u16,
     pub quest_6: u16,
+    pub travelled_act2: u16
+}
+
+impl Act1QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Act1QuestStatus> {
+        let introduced = reader.read_u16::<LittleEndian>()?;
+        let quest_1 = reader.read_u16::<LittleEndian>()?;
+        let quest_2 = reader.read_u16::<LittleEndian>()?;
+        let quest_3 = reader.read_u16::<LittleEndian>()?;
+        let quest_4 = reader.read_u16::<LittleEndian>()?;
+        let quest_5 = reader.read_u16::<LittleEndian>()?;
+        let quest_6 = reader.read_u16::<LittleEndian>()?;
+        let travelled_act2 = reader.read_u16::<LittleEndian>()?;
+
+        Ok(Act1QuestStatus {
+            introduced,
+            quest_1,
+            quest_2,
+            quest_3,
+            quest_4,
+            quest_5,
+            quest_6,
+            travelled_act2
+        })
+    }
+}
+
+impl Debug for Act1QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    act_1")?;
+        writeln!(f, "      q1")?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone,Default)]
 pub struct Act2QuestStatus {
-    pub enable_a: u16,
-    pub enable_b: u16,
+    pub introduced: u16,
     pub quest_1: u16,
     pub quest_2: u16,
     pub quest_3: u16,
     pub quest_4: u16,
     pub quest_5: u16,
     pub quest_6: u16,
+    pub travelled_act3: u16
+}
+
+impl Act2QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Act2QuestStatus> {
+        let introduced = reader.read_u16::<LittleEndian>()?;
+        let quest_1 = reader.read_u16::<LittleEndian>()?;
+        let quest_2 = reader.read_u16::<LittleEndian>()?;
+        let quest_3 = reader.read_u16::<LittleEndian>()?;
+        let quest_4 = reader.read_u16::<LittleEndian>()?;
+        let quest_5 = reader.read_u16::<LittleEndian>()?;
+        let quest_6 = reader.read_u16::<LittleEndian>()?;
+        let travelled_act3 = reader.read_u16::<LittleEndian>()?;
+
+        Ok(Act2QuestStatus {
+            introduced,
+            quest_1,
+            quest_2,
+            quest_3,
+            quest_4,
+            quest_5,
+            quest_6,
+            travelled_act3
+        })
+    }
+}
+
+impl Debug for Act2QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    act_2")?;
+        writeln!(f, "      q1")?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone,Default)]
 pub struct Act3QuestStatus {
-    pub enable_a: u16,
-    pub enable_b: u16,
+    pub introduced: u16,
     pub quest_1: u16,
     pub quest_2: u16,
     pub quest_3: u16,
     pub quest_4: u16,
     pub quest_5: u16,
     pub quest_6: u16,
+    pub travelled_act4: u16
+}
+
+impl Act3QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Act3QuestStatus> {
+        let introduced = reader.read_u16::<LittleEndian>()?;
+        let quest_1 = reader.read_u16::<LittleEndian>()?;
+        let quest_2 = reader.read_u16::<LittleEndian>()?;
+        let quest_3 = reader.read_u16::<LittleEndian>()?;
+        let quest_4 = reader.read_u16::<LittleEndian>()?;
+        let quest_5 = reader.read_u16::<LittleEndian>()?;
+        let quest_6 = reader.read_u16::<LittleEndian>()?;
+        let travelled_act4 = reader.read_u16::<LittleEndian>()?;
+
+        Ok(Act3QuestStatus {
+            introduced,
+            quest_1,
+            quest_2,
+            quest_3,
+            quest_4,
+            quest_5,
+            quest_6,
+            travelled_act4
+        })
+    }
+}
+
+impl Debug for Act3QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    act_3")?;
+        writeln!(f, "      q1")?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone,Default)]
 pub struct Act4QuestStatus {
-    pub enable_a: u16,
-    pub enable_b: u16,
+    pub introduced: u16,
     pub quest_1: u16,
     pub quest_2: u16,
     pub quest_3: u16,
+    pub travelled_act5: u16
 }
 
-#[derive(Clone)]
+impl Act4QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Act4QuestStatus> {
+        let introduced = reader.read_u16::<LittleEndian>()?;
+        let quest_1 = reader.read_u16::<LittleEndian>()?;
+        let quest_2 = reader.read_u16::<LittleEndian>()?;
+        let quest_3 = reader.read_u16::<LittleEndian>()?;
+        let travelled_act5 = reader.read_u16::<LittleEndian>()?;
+
+        Ok(Act4QuestStatus {
+            introduced,
+            quest_1,
+            quest_2,
+            quest_3,
+            travelled_act5
+        })
+    }
+}
+
+impl Debug for Act4QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    act_4")?;
+        writeln!(f, "      q1")?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone,Default)]
 pub struct Act5QuestStatus {
-    pub enable_a: u16,
-    pub reserved1: [u8;6],
-    pub enable_b: u16,
-    pub reserved2: [u8;4],
+    pub introduced: u16,
+    pub unknown1: [u16;3],
+    pub unknown2: u16,
+    pub unknown3: [u16;2],
     pub quest_1: u16,
     pub quest_2: u16,
     pub quest_3: u16,
@@ -468,3 +693,132 @@ pub struct Act5QuestStatus {
     pub quest_5: u16,
     pub quest_6: u16,
 }
+
+impl Act5QuestStatus {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Act5QuestStatus> {
+        let introduced = reader.read_u16::<LittleEndian>()?;
+        let mut unknown1 = [0u16;3];
+        for b in &mut unknown1 {
+            *b = reader.read_u16::<LittleEndian>()?;
+        }
+        let unknown2 = reader.read_u16::<LittleEndian>()?;
+        let mut unknown3 = [0u16;2];
+        for b in &mut unknown3 {
+            *b = reader.read_u16::<LittleEndian>()?;
+        }
+        let quest_1 = reader.read_u16::<LittleEndian>()?;
+        let quest_2 = reader.read_u16::<LittleEndian>()?;
+        let quest_3 = reader.read_u16::<LittleEndian>()?;
+        let quest_4 = reader.read_u16::<LittleEndian>()?;
+        let quest_5 = reader.read_u16::<LittleEndian>()?;
+        let quest_6 = reader.read_u16::<LittleEndian>()?;
+
+
+        Ok(Act5QuestStatus {
+            introduced,
+            unknown1,
+            unknown2,
+            unknown3,
+            quest_1,
+            quest_2,
+            quest_3,
+            quest_4,
+            quest_5,
+            quest_6,
+        })
+    }
+}
+
+impl Debug for Act5QuestStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    act_5")?;
+        writeln!(f, "      q1")?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone,Default)]
+pub struct Waypoints {
+    pub identifier: [u8;2],
+    pub unknown: u8,
+    pub normal: ActWaypoints,
+    pub nightmare: ActWaypoints,
+    pub hell: ActWaypoints,
+}
+
+impl Waypoints {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<Waypoints> {
+        let mut identifier = [0u8;2];
+        for b in &mut identifier {
+            *b = reader.read_u8()?;
+        }
+
+        let unknown = reader.read_u8()?;
+        let normal = ActWaypoints::from(reader)?;
+        let nightmare = ActWaypoints::from(reader)?;
+        let hell = ActWaypoints::from(reader)?;
+
+        Ok(Waypoints {
+            identifier,
+            unknown,
+            normal,
+            nightmare,
+            hell
+        })
+    }
+}
+
+impl Debug for Waypoints {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "  normal")?;
+        write!(f, "{:?}", self.normal)?;
+        writeln!(f, "  nightmare")?;
+        write!(f, "{:?}", self.nightmare)?;
+        writeln!(f, "  hell")?;
+        write!(f, "{:?}", self.hell)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone,Default)]
+pub struct ActWaypoints {
+    pub unknown: [u8;2],
+    pub waypoints: [u8;5],
+    pub unknown2: [u8;17]
+}
+
+impl ActWaypoints {
+    pub fn from(reader: &mut Cursor<&[u8]>) -> Result<ActWaypoints> {
+        let mut unknown = [0u8;2];
+        for b in &mut unknown {
+            *b = reader.read_u8()?;
+        }
+
+        let mut waypoints = [0u8;5];
+        for b in &mut waypoints {
+            *b = reader.read_u8()?;
+        }
+
+        let mut unknown2 = [0u8;17];
+        for b in &mut unknown2 {
+            *b = reader.read_u8()?;
+        }
+
+        Ok(ActWaypoints {
+            unknown,
+            waypoints,
+            unknown2
+        })
+    }
+}
+
+impl Debug for ActWaypoints {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "    waypoints here")?;
+
+        Ok(())
+    }
+}
+

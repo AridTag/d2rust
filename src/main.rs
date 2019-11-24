@@ -9,7 +9,7 @@ use crate::states::InitState;
 use amethyst::assets::Processor;
 use amethyst::core::transform::TransformBundle;
 use amethyst::renderer::{
-    plugins::{RenderToWindow},
+    plugins::{RenderToWindow,RenderFlat2D},
     types::DefaultBackend,
     RenderingBundle
 };
@@ -77,7 +77,8 @@ fn main() -> amethyst::Result<()> {
         .with_bundle(
             RenderingBundle::<DefaultBackend>::new()
                 .with_plugin(RenderToWindow::from_config_path(display_config_path).with_clear(CORNFLOWER_BLUE))
-                .with_plugin(RenderImgui::<StringBindings>::default()),
+                .with_plugin(RenderFlat2D::default())
+                .with_plugin(RenderImgui::<StringBindings>::default())
         )?;
 
 

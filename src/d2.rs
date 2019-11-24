@@ -50,13 +50,13 @@ impl SimpleState for D2 {
 
             let loader = &data.world.read_resource::<Loader>();
 
-            let d2s_handle = loader.load_from(
+            /*let d2s_handle = loader.load_from(
                 "C:\\Users\\jon\\Saved Games\\Diablo II\\Ass.d2s",
                 D2sFormat,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<D2sAsset>>(),
-            );
+            );*/
 
             /*let palette_handle = loader.load_from(
                 "data\\global\\palette\\loading\\pal.dat",
@@ -92,7 +92,7 @@ impl SimpleState for D2 {
 
             /*let mut transform = Transform::default();
             transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));*/
 
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
@@ -102,14 +102,14 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<Dc6Asset>>());
 
             let palette_handle = loader.load_from(
-                "data\\global\\palette\\Sky\\pal.dat",
+                "data\\global\\palette\\units\\pal.dat",
                 PaletteFormat,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
             let mut transform = Transform::default();
-            transform.set_xyz(window_width / 2.0 - 128.0, window_height / 2.0 + 256.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));*/
+            transform.set_translation_xyz(0.0-164.0, 0.0, 0.0);
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
 
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
@@ -120,7 +120,7 @@ impl SimpleState for D2 {
             );
 
             let palette_handle = loader.load_from(
-                "data\\global\\palette\\Sky\\pal.dat",
+                "data\\global\\palette\\units\\pal.dat",
                 PaletteFormat,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
@@ -128,8 +128,8 @@ impl SimpleState for D2 {
             );
             let mut transform = Transform::default();
             transform.set_translation_xyz(
-                window_width / 2.0 + 32.0,
-                window_height / 2.0 + 256.0,
+                0.0,
+                0.0,
                 0.0,
             );
             self.dc6_palettes_to_convert
@@ -156,8 +156,6 @@ impl SimpleState for D2 {
                     .expect("Wheres the palette?");
                 let dc6 = dc6_assets.get(&dc6_handle).expect("Where's the dc6?");
 
-                //println!("{:?}", dc6.0);
-
                 let loader = &data.world.read_resource::<Loader>();
                 let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
                 let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
@@ -183,13 +181,12 @@ impl SimpleState for D2 {
             }
 
             self.is_initialized = true;
-        } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity
-        {
+        } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
             for (spritesheet_handle, update_rate, transform) in &self.handles_to_spawn {
                 spawn_animated_dc6(
                     data,
-                    transform.clone(),
-                    spritesheet_handle.clone(),
+                    (*transform).clone(),
+                    (*spritesheet_handle).clone(),
                     *update_rate,
                 );
             }
@@ -231,7 +228,7 @@ fn init_camera(world: &mut World) {
     };
 
     let mut transform = Transform::default();
-    transform.set_translation_z(1.0);
+    transform.set_translation_xyz(0.0, 0.0, 1.0);
     world
         .create_entity()
         .with(Camera::standard_2d(width, height))
