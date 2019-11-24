@@ -149,13 +149,13 @@ pub struct Dc6Frame {
     /// The pixel palette indices for this frame
     /// This field is arranged such that [(0,0)] is top left
     /// When serialized it should be written in the order denoted by [header.flipped](Dc6FrameHeader::flipped)
-    pub pixels: Array2<u8>
+    pub pixels: Array2<Option<u8>>
 }
 
 impl Dc6Frame {
     fn from(reader: &mut Cursor<&[u8]>) -> Result<Dc6Frame> {
         let header = Dc6FrameHeader::from(reader)?;
-        let pixels: Array2<u8> = Dc6Frame::decode_pixels(reader, &header)?;
+        let pixels = Dc6Frame::decode_pixels(reader, &header)?;
 
         Ok(Dc6Frame {
             header,
@@ -163,10 +163,12 @@ impl Dc6Frame {
         })
     }
 
-    fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<u8>> {
+    fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<Option<u8>>> {
         const TRANSPARENT_OPCODE: u8 = 0x80;
 
-        let mut pixels: Array2<u8> = Array2::zeros((frame_header.width as usize, frame_header.height as usize));
+        let mut pixels: Array2<Option<u8>> = Array::from_shape_fn((frame_header.width as usize, frame_header.height as usize), |i| {
+            None
+        });
         let mut x: usize = 0;
         let mut y: usize = 0;
         if frame_header.flipped == 0 {
@@ -196,7 +198,7 @@ impl Dc6Frame {
             } else {
                 // opcode number of palette indices in a row
                 for _ in 0..opcode {
-                    pixels[(x, y)] = reader.read_u8()?;
+                    pixels[(x, y)] = Some(reader.read_u8()?);
                     i += 1;
                     x += 1;
                 }

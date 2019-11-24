@@ -73,15 +73,22 @@ impl Dc6Asset {
                 let frame = dc6.frames.get(frame_index).unwrap();
                 for y in 0..frame.header.height {
                     for x in 0..frame.header.width {
-                        let palette_index = frame.pixels[(x as usize, y as usize)] as usize;
-                        let pixel_color: [u8; 3] = palette.0.colors[palette_index];
-
-                        let pixel_data_index =
-                            (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
-                        pixel_data[pixel_data_index + 0] = pixel_color[2];
-                        pixel_data[pixel_data_index + 1] = pixel_color[1];
-                        pixel_data[pixel_data_index + 2] = pixel_color[0];
-                        pixel_data[pixel_data_index + 3] = 255;
+                        let pixel_data_index = (texture_starty + texture_startx + (x * 4) + (stride * y)) as usize;
+                        match frame.pixels[(x as usize, y as usize)] {
+                            None => {
+                                pixel_data[pixel_data_index + 0] = 0;
+                                pixel_data[pixel_data_index + 1] = 0;
+                                pixel_data[pixel_data_index + 2] = 0;
+                                pixel_data[pixel_data_index + 3] = 0;
+                            }
+                            Some(palette_index) => {
+                                let pixel_color: [u8; 3] = palette.0.colors[palette_index as usize];
+                                pixel_data[pixel_data_index + 0] = pixel_color[2];
+                                pixel_data[pixel_data_index + 1] = pixel_color[1];
+                                pixel_data[pixel_data_index + 2] = pixel_color[0];
+                                pixel_data[pixel_data_index + 3] = 255;
+                            }
+                        }
                     }
                 }
 
@@ -135,7 +142,7 @@ impl Dc6Asset {
         return (TextureData::from(texture_builder), sprites)
     }
 
-    /// returns the texture width, height and pixel data
+    /*/// returns the texture width, height and pixel data
     pub fn to_texturedata(&self, palette: &PaletteAsset) -> (u32, u32, Vec<u8>) {
         let dc6 = &self.0;
 
@@ -179,6 +186,7 @@ impl Dc6Asset {
                         pixel_data[pixel_data_index + 0] = pixel_color[2];
                         pixel_data[pixel_data_index + 1] = pixel_color[1];
                         pixel_data[pixel_data_index + 2] = pixel_color[0];
+
                         pixel_data[pixel_data_index + 3] = 255;
                     }
                 }
@@ -187,7 +195,7 @@ impl Dc6Asset {
         }
 
         return (texture_width, texture_height, pixel_data);
-    }
+    }*/
 }
 
 impl Asset for Dc6Asset {
