@@ -5,8 +5,8 @@ use crate::asset_formats::{
 use crate::d2assetsource;
 use amethyst::{
     assets::{Handle, AssetStorage, Loader, ProgressCounter},
-    core::{timing::Time, transform::Transform},
-    ecs::{join::Join, Component, DenseVecStorage, Read, ReadStorage, WriteStorage},
+    core::{transform::Transform},
+    ecs::{Component, DenseVecStorage},
     prelude::*,
     renderer::{
         Camera, SpriteRender, SpriteSheet, Texture
@@ -35,28 +35,30 @@ pub struct D2 {
     progress_counter: ProgressCounter,
     is_initialized: bool,
     spawned_entity: bool,
-    last_update: f64,
     dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
     handles_to_spawn: Vec<(Handle<SpriteSheet>, f64, Transform)>,
 }
 
+fn get_window_size(world: &mut World) -> (f32, f32) {
+    let dim = world.read_resource::<ScreenDimensions>();
+    (dim.width(), dim.height())
+}
+
+
 impl SimpleState for D2 {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         {
-            let (window_width, window_height) = {
-                let dim = data.world.read_resource::<ScreenDimensions>();
-                (dim.width(), dim.height())
-            };
+            //let (window_width, window_height) = get_window_size(data.world);
 
             let loader = &data.world.read_resource::<Loader>();
 
-            let d2s_handle = loader.load_from(
+            /*let d2s_handle = loader.load_from(
                 "C:\\Users\\jon\\Saved Games\\Diablo II\\Ass.d2s",
                 D2sFormat,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<D2sAsset>>(),
-            );
+            );*/
 
             /*let palette_handle = loader.load_from(
                 "data\\global\\palette\\loading\\pal.dat",
@@ -76,8 +78,8 @@ impl SimpleState for D2 {
             transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
             self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));*/
 
-            /*let dc6_handle = loader.load_from(
-                "data\\global\\ui\\frontend\\ts11b.dc6",
+            let dc6_handle = loader.load_from(
+                "data\\global\\ui\\MENU\\questdone.dc6",
                 Dc6Format,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
@@ -92,7 +94,7 @@ impl SimpleState for D2 {
 
             let mut transform = Transform::default();
             transform.set_translation_xyz(0.0, 0.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));*/
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.2, transform));
 
             /*let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoBlackLeft.DC6",//"data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
@@ -109,9 +111,9 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
             let mut transform = Transform::default();
             transform.set_translation_xyz(0.0-174.0, 0.0-100.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));*/
 
-            let dc6_handle = loader.load_from(
+            /*let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
                 Dc6Format,
                 d2assetsource::SOURCE_NAME,
@@ -126,7 +128,7 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<PaletteAsset>>());
             let mut transform = Transform::default();
             transform.set_translation_xyz(0.0-174.0, 0.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));
+            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.2, transform));
 
             let dc6_handle = loader.load_from(
                 "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
@@ -150,7 +152,7 @@ impl SimpleState for D2 {
                 0.0,
             );
             self.dc6_palettes_to_convert
-                .push((dc6_handle, palette_handle, 0.1, transform));*/
+                .push((dc6_handle, palette_handle, 0.2, transform));*/
         }
 
         /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
@@ -208,29 +210,6 @@ impl SimpleState for D2 {
             }
 
             self.spawned_entity = true;
-        } else if self.spawned_entity {
-            let StateData { world, .. } = data;
-            // Execute a pass similar to a system
-            world.exec(
-                |(mut write_sprite, read_spritecount, time): (
-                    WriteStorage<SpriteRender>,
-                    ReadStorage<SpriteCountComponent>,
-                    Read<Time>,
-                )| {
-                    if time.absolute_time_seconds() - self.last_update >= 0.4 {
-                        self.last_update = time.absolute_time_seconds();
-
-                        for (sprite, sprite_count) in (&mut write_sprite, &read_spritecount).join()
-                        {
-                            if sprite.sprite_number < sprite_count.count - 1 {
-                                sprite.sprite_number += 1;
-                            } else {
-                                sprite.sprite_number = 0;
-                            }
-                        }
-                    }
-                },
-            );
         }
 
         Trans::None
@@ -287,7 +266,6 @@ impl D2 {
             progress_counter: ProgressCounter::new(),
             is_initialized: false,
             spawned_entity: false,
-            last_update: 0.0,
             dc6_palettes_to_convert: vec![],
             handles_to_spawn: vec![],
         }

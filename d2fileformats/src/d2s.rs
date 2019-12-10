@@ -176,7 +176,7 @@ impl D2s {
                     quests: Default::default()
                 };
 
-            //println!("{:?}", result);
+            println!("{:?}", result);
 
             return Ok(result);
         }

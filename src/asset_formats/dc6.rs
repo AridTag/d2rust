@@ -2,7 +2,7 @@ use crate::asset_formats::PaletteAsset;
 use amethyst::assets::{Asset, Handle, ProcessingState, Format};
 use amethyst::ecs::prelude::VecStorage;
 use amethyst::renderer::{
-    Sprite, types::TextureData, loaders::load_from_srgba, palette::Srgba, rendy::texture::TextureBuilder, rendy::texture::image::TextureKind,
+    Sprite, types::TextureData, rendy::texture::TextureBuilder,
     rendy::hal::image::{
         Kind, ViewKind, SamplerInfo, WrapMode, Filter, Anisotropic, PackedColor
     }
@@ -92,6 +92,10 @@ impl Dc6Asset {
                     }
                 }
 
+                let offset_x = frame.header.width as f32 / 2.0;// + frame.header.offset_x as f32;
+                let offset_y = (-(frame.header.height as f32 / 2.0)) + frame.header.offset_y as f32;
+                //println!("{} {} ({} {})", frame.header.offset_x, frame.header.offset_y, offset_x, offset_y);
+
                 let sprite = Sprite::from_pixel_values(
                     texture_width,
                     texture_height,
@@ -100,8 +104,8 @@ impl Dc6Asset {
                     sprite_start_x,
                     texture_starty,
                     [
-                        frame.header.width as f32 / 2.0,
-                        -(frame.header.height as f32) / 2.0,
+                        offset_x,
+                        offset_y,
                     ],
                     false,
                     false

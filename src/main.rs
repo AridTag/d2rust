@@ -6,6 +6,7 @@ extern crate mpq;
 use crate::asset_formats::{D2sAsset, Dc6Asset, PaletteAsset};
 use crate::d2::{SpriteAnimationComponent, SpriteCountComponent};
 use crate::states::InitState;
+use crate::systems::{SpriteAnimationSystem};
 use amethyst::assets::Processor;
 use amethyst::core::transform::TransformBundle;
 use amethyst::renderer::{
@@ -24,6 +25,7 @@ mod asset_formats;
 mod d2;
 mod d2assetsource;
 mod states;
+mod systems;
 
 #[derive(Default, Clone, Copy)]
 pub struct ImguiUseSystem;
@@ -63,7 +65,8 @@ fn main() -> amethyst::Result<()> {
         root_dir.to_str().unwrap()
     );
 
-    const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+    //const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+    //const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
     const CORNFLOWER_BLUE: [f32; 4] = [100.0 / 255.0, 149.0 / 255.0, 237.0 / 255.0, 1.0];
 
     let game_data = GameDataBuilder::default()
@@ -73,6 +76,7 @@ fn main() -> amethyst::Result<()> {
         .with(Processor::<D2sAsset>::new(), "", &[])
         .with_bundle(TransformBundle::new())?
         .with(ImguiUseSystem::default(), "imgui_use", &[])
+        .with(SpriteAnimationSystem::default(), "SpriteAnimationSystem", &[])
         .with_bundle(InputBundle::<StringBindings>::default())?
         .with_bundle(
             RenderingBundle::<DefaultBackend>::new()
