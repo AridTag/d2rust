@@ -13,6 +13,7 @@ use amethyst::{
     },
     window::ScreenDimensions
 };
+use amethyst::shred::Fetch;
 
 pub struct SpriteAnimationComponent {
     pub update_rate: f64,
@@ -34,7 +35,6 @@ impl Component for SpriteCountComponent {
 pub struct D2 {
     progress_counter: ProgressCounter,
     is_initialized: bool,
-    spawned_entity: bool,
     dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
     handles_to_spawn: Vec<(Handle<SpriteSheet>, f64, Transform)>,
 }
@@ -60,99 +60,27 @@ impl SimpleState for D2 {
                 &data.world.read_resource::<AssetStorage<D2sAsset>>(),
             );*/
 
-            /*let palette_handle = loader.load_from(
-                "data\\global\\palette\\loading\\pal.dat",
-                PaletteFormat,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
+            let dc6_asset_storage = &data.world.read_resource::<AssetStorage<Dc6Asset>>();
+            let palette_asset_storage = &data.world.read_resource::<AssetStorage<PaletteAsset>>();
 
-            let dc6_handle = loader.load_from(
-                "data\\global\\ui\\loading\\loadingscreen.dc6",
-                Dc6Format,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
+            /*self.load_dc6(loader, dc6_asset_storage, palette_asset_storage,
+                          "data\\global\\ui\\loading\\loadingscreen.dc6",
+                          "data\\global\\palette\\loading\\pal.dat",
+                          0.0, 0.0);*/
 
-            let mut transform = Transform::default();
-            transform.set_xyz(window_width / 2.0, window_height / 2.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.4, transform));*/
+            self.load_dc6(loader, dc6_asset_storage, palette_asset_storage,
+                          "data\\global\\ui\\MENU\\questdone.dc6",
+                          "data\\global\\palette\\units\\pal.dat",
+                          0.0, 0.0);
 
-            let dc6_handle = loader.load_from(
-                "data\\global\\ui\\MENU\\questdone.dc6",
-                Dc6Format,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
-
-            let palette_handle = loader.load_from(
-                "data\\global\\palette\\units\\pal.dat",
-                PaletteFormat,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
-
-            let mut transform = Transform::default();
-            transform.set_translation_xyz(0.0, 0.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.2, transform));
-
-            /*let dc6_handle = loader.load_from(
-                "data\\global\\ui\\FrontEnd\\D2logoBlackLeft.DC6",//"data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
-                Dc6Format,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
-
-            let palette_handle = loader.load_from(
-                "data\\global\\palette\\units\\pal.dat",
-                PaletteFormat,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
-            let mut transform = Transform::default();
-            transform.set_translation_xyz(0.0-174.0, 0.0-100.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.1, transform));*/
-
-            /*let dc6_handle = loader.load_from(
-                "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
-                Dc6Format,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>());
-
-            let palette_handle = loader.load_from(
-                "data\\global\\palette\\units\\pal.dat",
-                PaletteFormat,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>());
-            let mut transform = Transform::default();
-            transform.set_translation_xyz(0.0-174.0, 0.0, 0.0);
-            self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.2, transform));
-
-            let dc6_handle = loader.load_from(
-                "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
-                Dc6Format,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<Dc6Asset>>(),
-            );
-
-            let palette_handle = loader.load_from(
-                "data\\global\\palette\\units\\pal.dat",
-                PaletteFormat,
-                d2assetsource::SOURCE_NAME,
-                &mut self.progress_counter,
-                &data.world.read_resource::<AssetStorage<PaletteAsset>>(),
-            );
-            let mut transform = Transform::default();
-            transform.set_translation_xyz(
-                0.0,
-                0.0,
-                0.0,
-            );
-            self.dc6_palettes_to_convert
-                .push((dc6_handle, palette_handle, 0.2, transform));*/
+            /*self.load_dc6(loader, dc6_asset_storage, palette_asset_storage,
+                          "data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6",
+                          "data\\global\\palette\\units\\pal.dat",
+                          -174.0, -100.0);
+            self.load_dc6(loader, dc6_asset_storage, palette_asset_storage,
+                          "data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6",
+                          "data\\global\\palette\\units\\pal.dat",
+                          0.0, 0.0);*/
         }
 
         /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
@@ -199,7 +127,7 @@ impl SimpleState for D2 {
             }
 
             self.is_initialized = true;
-        } else if self.is_initialized && self.progress_counter.is_complete() && !self.spawned_entity {
+        } else if self.is_initialized && self.progress_counter.is_complete() && self.handles_to_spawn.len() > 0 {
             for (spritesheet_handle, update_rate, transform) in &self.handles_to_spawn {
                 spawn_animated_dc6(
                     data,
@@ -208,8 +136,7 @@ impl SimpleState for D2 {
                     *update_rate,
                 );
             }
-
-            self.spawned_entity = true;
+            self.handles_to_spawn.clear();
         }
 
         Trans::None
@@ -224,11 +151,10 @@ fn init_camera(world: &mut World) {
 
     let mut transform = Transform::default();
     transform.set_translation_xyz(0.0, 0.0, 1.0);
-    world
-        .create_entity()
-        .with(Camera::standard_2d(width, height))
-        .with(transform)
-        .build();
+    world.create_entity()
+         .with(Camera::standard_2d(width, height))
+         .with(transform)
+         .build();
 }
 
 fn spawn_animated_dc6(
@@ -265,34 +191,28 @@ impl D2 {
         D2 {
             progress_counter: ProgressCounter::new(),
             is_initialized: false,
-            spawned_entity: false,
             dc6_palettes_to_convert: vec![],
             handles_to_spawn: vec![],
         }
     }
 
-    /*fn load_ds1(archive: &mut Archive, filename: &str) -> Result<Ds1, Error> {
-        let file3 = archive.open_file(filename)?;
-        let mut buf3 = vec![0u8; file3.size() as usize];
+    fn load_dc6<S: Into<String>>(&mut self, loader: &Fetch<Loader>, dc6_asset_storage: &Fetch<AssetStorage<Dc6Asset>>, palette_asset_storage: &Fetch<AssetStorage<PaletteAsset>>, dc6_path: S, palette_path: S, x: f32, y: f32) {
+        let dc6_handle = loader.load_from(
+            dc6_path,
+            Dc6Format,
+            d2assetsource::SOURCE_NAME,
+            &mut self.progress_counter,
+            dc6_asset_storage);
 
-        file3.read(archive, &mut buf3)?;
+        let palette_handle = loader.load_from(
+            palette_path,
+            PaletteFormat,
+            d2assetsource::SOURCE_NAME,
+            &mut self.progress_counter,
+            palette_asset_storage);
 
-        Ds1::from(&buf3)
-    }*/
-
-    /*fn create_texture(&mut self, dc: &Dc6, palette: &Palette) -> Result<Texture, Error> {
-
-        let frame = &dc.frames[0];
-        let mut img: RgbaImage = ImageBuffer::new(frame.header.width as u32, frame.header.height as u32);
-        for (x, y, pixel) in img.enumerate_pixels_mut() {
-            let palette_index = frame.pixels[(x as usize, y as usize)] as usize;
-            let color: [u8; 3] = palette.colors[palette_index];
-            pixel.data[0] = color[2];
-            pixel.data[1] = color[1];
-            pixel.data[2] = color[0];
-            pixel.data[3] = 255;
-        }
-
-        Ok(Texture::from_image(&img, &TextureSettings::new()))
-    }*/
+        let mut transform = Transform::default();
+        transform.set_translation_xyz(x, y, 0.0);
+        self.dc6_palettes_to_convert.push((dc6_handle, palette_handle, 0.2, transform));
+    }
 }
