@@ -1,4 +1,4 @@
-use std::io::{Cursor, Seek, SeekFrom};
+use std::io::{Cursor, Seek, SeekFrom, Read};
 use byteorder::{ReadBytesExt,LittleEndian};
 
 pub struct Dt1 {
@@ -20,6 +20,7 @@ pub struct Tile {
     pub subtile_flags: [u8;25],
     pub block_header_pointer: u32,
     pub block_header_size: u32,
+    pub num_blocks: u32,
     pub blocks: Vec<Block>
 }
 
@@ -29,13 +30,13 @@ pub struct Block {
     pub grid_x: u8,
     pub grid_y: u8,
     pub format: u16,
-    pub encoded_data: Vec<u8>,
     pub length: u32,
-    pub file_offset: u32
+    pub file_offset: u32,
+    pub encoded_data: Vec<u8>,
 }
 
 impl Dt1 {
-    pub fn from(file_bytes: &[u8]) -> Result<Dt1, std::io::Error> {
+    pub fn from(file_bytes: &[u8]) -> Result<Dt1, crate::Error> {
         let mut reader = Cursor::new(file_bytes);
 
         let version1 = reader.read_u32::<LittleEndian>()?;
@@ -47,7 +48,17 @@ impl Dt1 {
         reader.seek(SeekFrom::Current(260))?;
 
         let num_tiles = reader.read_u32::<LittleEndian>()?;
-        let mut tiles = Vec::with_capacity(num_tiles as usize);
+        let tiles = Dt1::read_tiles(&mut reader, num_tiles as usize)?;
+
+        Ok(Dt1 {
+            version1,
+            version2,
+            tiles
+        })
+    }
+
+    fn read_tiles(reader: &mut Cursor<&[u8]>, num_tiles: usize) -> Result<Vec<Tile>, crate::Error> {
+        let mut tiles = Vec::with_capacity(num_tiles);
 
         for _ in 0..num_tiles {
             let direction = reader.read_u32::<LittleEndian>()?;
@@ -69,7 +80,8 @@ impl Dt1 {
             let block_header_pointer = reader.read_u32::<LittleEndian>()?;
             let block_header_size = reader.read_u32::<LittleEndian>()?;
             let num_blocks = reader.read_u32::<LittleEndian>()?;
-            let blocks = Vec::with_capacity(num_blocks as usize);
+            let blocks = Dt1::read_blocks(reader, num_blocks, block_header_pointer, block_header_size)?;
+
             reader.seek(SeekFrom::Current(12))?;
             tiles.push(Tile {
                 direction,
@@ -84,14 +96,51 @@ impl Dt1 {
                 subtile_flags,
                 block_header_pointer,
                 block_header_size,
+                num_blocks,
                 blocks
             })
         }
 
-        Ok(Dt1 {
-            version1,
-            version2,
-            tiles
-        })
+        Ok(tiles)
+    }
+
+    fn read_blocks(reader: &mut Cursor<&[u8]>, num_blocks: u32, block_header_pointer: u32, block_header_size: u32) -> Result<Vec<Block>, crate::Error> {
+        reader.seek(SeekFrom::Start(block_header_pointer as u64))?;
+
+        let mut blocks = Vec::with_capacity(num_blocks as usize);
+        for _ in 0..num_blocks {
+            let x = reader.read_u16::<LittleEndian>()?;
+            let y = reader.read_u16::<LittleEndian>()?;
+            reader.seek(SeekFrom::Current(2))?;
+            let grid_x = reader.read_u8()?;
+            let grid_y = reader.read_u8()?;
+            let format = reader.read_u16::<LittleEndian>()?;
+            let length = reader.read_u32::<LittleEndian>()?;
+            reader.seek(SeekFrom::Current(2))?;
+            let file_offset = reader.read_u32::<LittleEndian>()?;
+            let encoded_data = Dt1::read_block_data(reader, block_header_pointer + file_offset, length)?;
+
+            blocks.push(Block {
+                x,
+                y,
+                grid_x,
+                grid_y,
+                format,
+                length,
+                file_offset,
+                encoded_data
+            })
+        }
+
+        Ok(blocks)
+    }
+
+    fn read_block_data(reader: &mut Cursor<&[u8]>, data_offset: u32, length: u32) -> Result<Vec<u8>, crate::Error> {
+        reader.seek(SeekFrom::Start(data_offset as u64))?;
+
+        let mut block_data = vec![0u8; length as usize];
+        reader.read_exact(&mut block_data)?;
+
+        Ok(block_data)
     }
 }
