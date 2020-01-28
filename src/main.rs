@@ -3,7 +3,7 @@ extern crate amethyst;
 extern crate amethyst_imgui;
 extern crate mpq;
 
-use crate::asset_formats::{D2sAsset, Dc6Asset, PaletteAsset};
+use crate::asset_formats::{D2sAsset, Dc6Asset, PaletteAsset, Dt1Asset};
 use crate::d2::{SpriteAnimationComponent, SpriteCountComponent};
 use crate::states::InitState;
 use crate::systems::{SpriteAnimationSystem};
@@ -28,8 +28,8 @@ mod states;
 mod systems;
 
 #[derive(Default, Clone, Copy)]
-pub struct ImguiUseSystem;
-impl<'s> amethyst::ecs::System<'s> for ImguiUseSystem {
+pub struct ImguiDemoSystem;
+impl<'s> amethyst::ecs::System<'s> for ImguiDemoSystem {
     type SystemData = ();
 
     fn run(&mut self, _: Self::SystemData) {
@@ -74,8 +74,9 @@ fn main() -> amethyst::Result<()> {
         .with(Processor::<Dc6Asset>::new(), "", &[])
         .with(Processor::<PaletteAsset>::new(), "", &[])
         .with(Processor::<D2sAsset>::new(), "", &[])
+        .with(Processor::<Dt1Asset>::new(), "", &[])
         .with_bundle(TransformBundle::new())?
-        .with(ImguiUseSystem::default(), "imgui_use", &[])
+        .with(ImguiDemoSystem::default(), "imgui_demo", &[])
         .with(SpriteAnimationSystem::default(), "SpriteAnimationSystem", &[])
         .with_bundle(InputBundle::<StringBindings>::default())?
         .with_bundle(

@@ -1,12 +1,14 @@
 use std::io::{Cursor, Seek, SeekFrom, Read};
 use byteorder::{ReadBytesExt,LittleEndian};
 
+#[derive(Clone,Debug)]
 pub struct Dt1 {
     pub version1: u32,
     pub version2: u32,
     pub tiles: Vec<Tile>,
 }
 
+#[derive(Clone,Debug)]
 pub struct Tile {
     pub direction: u32,
     pub roof_height: u16,
@@ -24,6 +26,7 @@ pub struct Tile {
     pub blocks: Vec<Block>
 }
 
+#[derive(Clone,Debug)]
 pub struct Block {
     pub x: u16,
     pub y: u16,

@@ -1,6 +1,6 @@
 use crate::asset_formats::{
     D2sAsset, D2sFormat, D2sHandle, Dc6Asset, Dc6Format, Dc6Handle, PaletteAsset, PaletteFormat,
-    PaletteHandle,
+    PaletteHandle, Dt1Asset, Dt1Format, Dt1Handle
 };
 use crate::d2assetsource;
 use amethyst::{
@@ -37,6 +37,7 @@ pub struct D2 {
     is_initialized: bool,
     dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
     handles_to_spawn: Vec<(Handle<SpriteSheet>, f64, Transform)>,
+    dt1_handle: Option<Dt1Handle>,
 }
 
 fn get_window_size(world: &mut World) -> (f32, f32) {
@@ -59,6 +60,16 @@ impl SimpleState for D2 {
                 &mut self.progress_counter,
                 &data.world.read_resource::<AssetStorage<D2sAsset>>(),
             );*/
+
+            let dt1_asset_storage = &data.world.read_resource::<AssetStorage<Dt1Asset>>();
+
+            self.dt1_handle = Some(loader.load_from(
+                "data\\global\\tiles\\expansion\\BaalLair\\throne.dt1",
+                Dt1Format,
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                dt1_asset_storage));
+
 
             let dc6_asset_storage = &data.world.read_resource::<AssetStorage<Dc6Asset>>();
             let palette_asset_storage = &data.world.read_resource::<AssetStorage<PaletteAsset>>();
@@ -83,14 +94,18 @@ impl SimpleState for D2 {
                           0.0, 0.0);*/
         }
 
-        /*let mut archive2 = Archive::open("D:\\Diablo II\\d2exp.mpq").expect("Where's the archive bro?");
-        let _ds1 = D2::load_ds1(&mut archive2, "data\\global\\tiles\\expansion\\Town\\townWest.ds1");*/
-
         let world = data.world;
         init_camera(world);
     }
 
     fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
+        let errors = self.progress_counter.errors();
+        if !errors.is_empty() {
+            for error in errors {
+                println!("{} failed to load with error - {}", error.asset_name, error.error);
+            }
+        }
+
         if !self.is_initialized && self.progress_counter.is_complete() {
             let dc6_assets = data.world.read_resource::<AssetStorage<Dc6Asset>>();
             let palette_assets = data.world.read_resource::<AssetStorage<PaletteAsset>>();
@@ -127,7 +142,9 @@ impl SimpleState for D2 {
             }
 
             self.is_initialized = true;
-        } else if self.is_initialized && self.progress_counter.is_complete() && self.handles_to_spawn.len() > 0 {
+        }
+
+        if self.progress_counter.is_complete() && self.handles_to_spawn.len() > 0 {
             for (spritesheet_handle, update_rate, transform) in &self.handles_to_spawn {
                 spawn_animated_dc6(
                     data,
@@ -137,6 +154,18 @@ impl SimpleState for D2 {
                 );
             }
             self.handles_to_spawn.clear();
+        }
+
+        if self.progress_counter.is_complete() && self.dt1_handle.is_some() {
+            let dt1_assets = data.world.read_resource::<AssetStorage<Dt1Asset>>();
+            let dt1 = dt1_assets.get(self.dt1_handle.as_ref().unwrap()).expect("wheres the dt1?");
+
+            amethyst_imgui::with(|ui| {
+                ui.text(format!("Tiles: {}", dt1.0.tiles.len()));
+                for tile in &dt1.0.tiles {
+                    ui.text(format!("blocks {}", tile.num_blocks))
+                }
+            });
         }
 
         Trans::None
@@ -193,6 +222,7 @@ impl D2 {
             is_initialized: false,
             dc6_palettes_to_convert: vec![],
             handles_to_spawn: vec![],
+            dt1_handle: None,
         }
     }
 
