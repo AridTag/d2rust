@@ -166,7 +166,7 @@ impl Dc6Frame {
     fn decode_pixels(reader: &mut Cursor<&[u8]>, frame_header: &Dc6FrameHeader) -> Result<Array2<Option<u8>>> {
         const TRANSPARENT_OPCODE: u8 = 0x80;
 
-        let mut pixels: Array2<Option<u8>> = Array::from_shape_fn((frame_header.width as usize, frame_header.height as usize), |i| {
+        let mut pixels: Array2<Option<u8>> = Array::from_shape_fn((frame_header.width as usize, frame_header.height as usize), |_| {
             None
         });
         let mut x: usize = 0;

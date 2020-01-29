@@ -15,6 +15,12 @@ use amethyst::{
 };
 use amethyst::shred::Fetch;
 
+use amethyst_imgui::{
+    imgui,
+    imgui::{im_str, ImString,Condition},
+    RenderImgui
+};
+
 pub struct SpriteAnimationComponent {
     pub update_rate: f64,
     pub last_update: f64,
@@ -161,10 +167,53 @@ impl SimpleState for D2 {
             let dt1 = dt1_assets.get(self.dt1_handle.as_ref().unwrap()).expect("wheres the dt1?");
 
             amethyst_imgui::with(|ui| {
-                ui.text(format!("Tiles: {}", dt1.0.tiles.len()));
-                for tile in &dt1.0.tiles {
-                    ui.text(format!("blocks {}", tile.num_blocks))
-                }
+                let title = im_str!("throne.dt1");
+                let mut window = imgui::Window::new(&title)
+                    .save_settings(false);
+
+                window.build(ui, || {
+                    ui.text(format!("Tiles: {}", dt1.0.tiles.len()));
+                    for tile_index in 0..dt1.0.tiles.len() {
+                        let tile = &dt1.0.tiles[tile_index];
+                        let node_id = ImString::new(format!("t{}", tile_index));
+                        let tile_string = ImString::new(format!("Tile: {}", tile_index));
+                        ui.tree_node(&node_id)
+                            .label(&tile_string)
+                            .build(|| {
+                                ui.text(format!("Type: {}", tile.tile_type));
+                                for sub_tile_index in 0..tile.sub_tiles.len() {
+                                    let sub_tile = &tile.sub_tiles[sub_tile_index];
+                                    let node_id = ImString::new(format!("t{}st{}", tile_index, sub_tile_index));
+                                    let sub_tile_string = ImString::new(format!("{}", sub_tile_index));
+                                    let mut node = ui.tree_node(&node_id)
+                                        .label(&sub_tile_string)
+                                        .opened(true, Condition::Always);
+                                    node.build(|| {
+                                        let node_id = ImString::new(format!("t{}st{}pos", tile_index, sub_tile_index));
+                                        let pos_string = ImString::new(format!("Pos: ({},{})", sub_tile.x, sub_tile.y));
+                                        ui.tree_node(&node_id)
+                                          .label(&pos_string)
+                                          .leaf(true)
+                                          .build(|| { });
+
+                                        let node_id = ImString::new(format!("t{}st{}grid", tile_index, sub_tile_index));
+                                        let grid_string = ImString::new(format!("Grid: ({},{})", sub_tile.grid_x, sub_tile.grid_y));
+                                        ui.tree_node(&node_id)
+                                            .label(&grid_string)
+                                            .leaf(true)
+                                            .build(|| { });
+
+                                        let node_id = ImString::new(format!("t{}st{}format", tile_index, sub_tile_index));
+                                        let format_string = ImString::new(format!("Format: {:?}", sub_tile.format));
+                                        ui.tree_node(&node_id)
+                                            .label(&format_string)
+                                            .leaf(true)
+                                            .build(|| { });
+                                    });
+                                }
+                            });
+                    }
+                });
             });
         }
 
