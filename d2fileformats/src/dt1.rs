@@ -13,8 +13,8 @@ pub struct Tile {
     pub direction: u32,
     pub roof_height: u16,
     pub material_flags: u16,
-    pub height: u32,
-    pub width: u32,
+    pub height: i32,
+    pub width: i32,
     pub tile_type: u32,
     pub style: u32,
     pub sequence: u32,
@@ -28,8 +28,8 @@ pub struct Tile {
 
 #[derive(Clone,Debug)]
 pub struct SubTile {
-    pub x: u16,
-    pub y: u16,
+    pub x: i16,
+    pub y: i16,
     pub grid_x: u8,
     pub grid_y: u8,
     pub format: TileFormat,
@@ -40,17 +40,18 @@ pub struct SubTile {
 
 #[derive(Clone,Debug)]
 pub enum TileFormat {
-    Standard,
+    Standard(u16),
     Isometric,
-    Unknown(u16),
+    //Unknown(u16),
 }
 
 impl TileFormat {
     pub fn from_u16(value: u16) -> TileFormat {
         match value {
-            0 => TileFormat::Standard,
+            //0 => TileFormat::Standard,
             1 => TileFormat::Isometric,
-            x => TileFormat::Unknown(x)
+            x => TileFormat::Standard(x)
+            //x => TileFormat::Unknown(x)
         }
     }
 }
@@ -69,6 +70,8 @@ impl Dt1 {
         reader.seek(SeekFrom::Current(260))?;
 
         let num_tiles = reader.read_u32::<LittleEndian>()?;
+        let tiles_pointer = reader.read_u32::<LittleEndian>()?;
+        reader.seek(SeekFrom::Start(tiles_pointer as u64))?;
         let tiles = Dt1::read_tiles(&mut reader, num_tiles as usize)?;
 
         Ok(Dt1 {
@@ -85,8 +88,8 @@ impl Dt1 {
             let direction = reader.read_u32::<LittleEndian>()?;
             let roof_height = reader.read_u16::<LittleEndian>()?;
             let material_flags = reader.read_u16::<LittleEndian>()?;
-            let height = reader.read_u32::<LittleEndian>()?;
-            let width = reader.read_u32::<LittleEndian>()?;
+            let height = reader.read_i32::<LittleEndian>()?;
+            let width = reader.read_i32::<LittleEndian>()?;
             reader.seek(SeekFrom::Current(4))?;
             let tile_type = reader.read_u32::<LittleEndian>()?;
             let style = reader.read_u32::<LittleEndian>()?;
@@ -101,9 +104,9 @@ impl Dt1 {
             let sub_tiles_header_pointer = reader.read_u32::<LittleEndian>()?;
             let sub_tiles_header_size = reader.read_u32::<LittleEndian>()?;
             let num_sub_tiles = reader.read_u32::<LittleEndian>()?;
+            reader.seek(SeekFrom::Current(12))?;
             let sub_tiles = Dt1::read_sub_tiles(reader, num_sub_tiles, sub_tiles_header_pointer, sub_tiles_header_size)?;
 
-            reader.seek(SeekFrom::Current(12))?;
             tiles.push(Tile {
                 direction,
                 roof_height,
@@ -126,12 +129,13 @@ impl Dt1 {
     }
 
     fn read_sub_tiles(reader: &mut Cursor<&[u8]>, num_sub_tiles: u32, sub_tiles_header_pointer: u32, sub_tiles_header_size: u32) -> Result<Vec<SubTile>, crate::Error> {
+        let current_reader_pos = reader.position();
         reader.seek(SeekFrom::Start(sub_tiles_header_pointer as u64))?;
 
         let mut sub_tiles = Vec::with_capacity(num_sub_tiles as usize);
         for _ in 0..num_sub_tiles {
-            let x = reader.read_u16::<LittleEndian>()?;
-            let y = reader.read_u16::<LittleEndian>()?;
+            let x = reader.read_i16::<LittleEndian>()?;
+            let y = reader.read_i16::<LittleEndian>()?;
             reader.seek(SeekFrom::Current(2))?;
             let grid_x = reader.read_u8()?;
             let grid_y = reader.read_u8()?;
@@ -153,15 +157,18 @@ impl Dt1 {
             });
         }
 
+        reader.seek(SeekFrom::Start(current_reader_pos))?;
         Ok(sub_tiles)
     }
 
     fn read_block_data(reader: &mut Cursor<&[u8]>, data_offset: u32, length: u32) -> Result<Vec<u8>, crate::Error> {
+        let current_reader_pos = reader.position();
         reader.seek(SeekFrom::Start(data_offset as u64))?;
 
         let mut block_data = vec![0u8; length as usize];
         reader.read_exact(&mut block_data)?;
 
+        reader.seek(SeekFrom::Start(current_reader_pos))?;
         Ok(block_data)
     }
 }

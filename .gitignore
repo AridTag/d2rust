@@ -1,6 +1,8 @@
 /target
 **/*.rs.bk
 
+imgui.ini
+
 
 # Created by https://www.gitignore.io/api/intellij
 # Edit at https://www.gitignore.io/?templates=intellij

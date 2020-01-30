@@ -180,7 +180,10 @@ impl SimpleState for D2 {
                         ui.tree_node(&node_id)
                             .label(&tile_string)
                             .build(|| {
+                                ui.text(format!("Size: ({},{})", tile.width, tile.height));
                                 ui.text(format!("Type: {}", tile.tile_type));
+                                ui.text(format!("Direction: {}", tile.direction));
+                                ui.text(format!("Roof Height: {}", tile.roof_height));
                                 for sub_tile_index in 0..tile.sub_tiles.len() {
                                     let sub_tile = &tile.sub_tiles[sub_tile_index];
                                     let node_id = ImString::new(format!("t{}st{}", tile_index, sub_tile_index));
