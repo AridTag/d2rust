@@ -70,7 +70,7 @@ impl SimpleState for D2 {
             let dt1_asset_storage = &data.world.read_resource::<AssetStorage<Dt1Asset>>();
 
             self.dt1_handle = Some(loader.load_from(
-                "data\\global\\tiles\\expansion\\BaalLair\\throne.dt1",
+                "data\\global\\tiles\\ACT1\\Outdoors\\swamp.dt1",
                 Dt1Format,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
@@ -167,7 +167,7 @@ impl SimpleState for D2 {
             let dt1 = dt1_assets.get(self.dt1_handle.as_ref().unwrap()).expect("wheres the dt1?");
 
             amethyst_imgui::with(|ui| {
-                let title = im_str!("throne.dt1");
+                let title = im_str!("dt1");
                 let mut window = imgui::Window::new(&title)
                     .save_settings(false);
 

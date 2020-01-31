@@ -84,7 +84,7 @@ impl Dt1 {
     fn read_tiles(reader: &mut Cursor<&[u8]>, num_tiles: usize) -> Result<Vec<Tile>, crate::Error> {
         let mut tiles = Vec::with_capacity(num_tiles);
 
-        for _ in 0..num_tiles {
+        for _ in 0..1/*num_tiles*/ {
             let direction = reader.read_u32::<LittleEndian>()?;
             let roof_height = reader.read_u16::<LittleEndian>()?;
             let material_flags = reader.read_u16::<LittleEndian>()?;

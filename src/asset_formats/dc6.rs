@@ -117,12 +117,6 @@ impl Dc6Asset {
             }
         }
 
-        /*let metadata =
-            TextureMetadata::srgb_scale().with_size(texture_width as u16, texture_height as u16);*/
-
-        /*let mut texture_builder = load_from_srgba(Srgba::new(0., 0., 0., 0.));
-        texture_builder.set_data_width(texture_width);
-        texture_builder.set_data_height(texture_height);*/
         let texture_builder = TextureBuilder::new()
             .with_data_width(texture_width)
             .with_data_height(texture_height)
