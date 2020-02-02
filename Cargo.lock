@@ -877,6 +877,7 @@ version = "0.0.1"
 dependencies = [
  "amethyst 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "amethyst-imgui 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "d2fileformats 0.0.1",
  "mpq 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

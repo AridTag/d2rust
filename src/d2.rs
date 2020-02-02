@@ -9,7 +9,7 @@ use amethyst::{
     ecs::{Component, DenseVecStorage},
     prelude::*,
     renderer::{
-        Camera, SpriteRender, SpriteSheet, Texture
+        Camera, SpriteRender, SpriteSheet, Sprite, Texture
     },
     window::ScreenDimensions
 };
@@ -42,6 +42,7 @@ pub struct D2 {
     progress_counter: ProgressCounter,
     is_initialized: bool,
     dc6_palettes_to_convert: Vec<(Dc6Handle, PaletteHandle, f64, Transform)>,
+    dt1_sprites_to_convert: Vec<(Dt1Handle, PaletteHandle, f64, Transform)>,
     handles_to_spawn: Vec<(Handle<SpriteSheet>, f64, Transform)>,
     dt1_handle: Option<Dt1Handle>,
 }
@@ -68,17 +69,33 @@ impl SimpleState for D2 {
             );*/
 
             let dt1_asset_storage = &data.world.read_resource::<AssetStorage<Dt1Asset>>();
+            let dc6_asset_storage = &data.world.read_resource::<AssetStorage<Dc6Asset>>();
+            let palette_asset_storage = &data.world.read_resource::<AssetStorage<PaletteAsset>>();
 
+            let dt1_handle = loader.load_from(
+                "data\\global\\tiles\\ACT1\\Outdoors\\swamp.dt1",
+                Dt1Format,
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                dt1_asset_storage);
             self.dt1_handle = Some(loader.load_from(
                 "data\\global\\tiles\\ACT1\\Outdoors\\swamp.dt1",
                 Dt1Format,
                 d2assetsource::SOURCE_NAME,
                 &mut self.progress_counter,
                 dt1_asset_storage));
+            let dt1_palette = loader.load_from(
+                "data\\global\\palette\\ACT1\\pal.dat",
+                PaletteFormat,
+                d2assetsource::SOURCE_NAME,
+                &mut self.progress_counter,
+                palette_asset_storage);
+            let mut transform = Transform::default();
+            transform.set_translation_xyz(0.0, 100.0, 0.0);
+            self.dt1_sprites_to_convert.push((dt1_handle, dt1_palette, 0.5, transform));
 
 
-            let dc6_asset_storage = &data.world.read_resource::<AssetStorage<Dc6Asset>>();
-            let palette_asset_storage = &data.world.read_resource::<AssetStorage<PaletteAsset>>();
+
 
             /*self.load_dc6(loader, dc6_asset_storage, palette_asset_storage,
                           "data\\global\\ui\\loading\\loadingscreen.dc6",
@@ -116,8 +133,7 @@ impl SimpleState for D2 {
             let dc6_assets = data.world.read_resource::<AssetStorage<Dc6Asset>>();
             let palette_assets = data.world.read_resource::<AssetStorage<PaletteAsset>>();
 
-            for (dc6_handle, palette_handle, update_rate, transform) in &self.dc6_palettes_to_convert
-            {
+            for (dc6_handle, palette_handle, update_rate, transform) in &self.dc6_palettes_to_convert {
                 let palette = palette_assets
                     .get(&palette_handle)
                     .expect("Wheres the palette?");
@@ -128,6 +144,36 @@ impl SimpleState for D2 {
                 let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
 
                 let (texture_data, sprites) = dc6.to_sprites(&palette);
+                let texture_handle = loader.load_from_data(
+                    texture_data,
+                    &mut self.progress_counter,
+                    texture_storage,
+                );
+                let spritesheet = SpriteSheet {
+                    texture: texture_handle.clone(),
+                    sprites,
+                };
+                let spritesheet_handle = loader.load_from_data(
+                    spritesheet,
+                    &mut self.progress_counter,
+                    spritesheet_storage,
+                );
+
+                self.handles_to_spawn
+                    .push((spritesheet_handle, *update_rate, transform.clone()));
+            }
+
+            let dt1_assets = data.world.read_resource::<AssetStorage<Dt1Asset>>();
+            for (dt1_handle, palette_handle, update_rate, transform) in &self.dt1_sprites_to_convert {
+                //break;
+                let dt1 = dt1_assets.get(&dt1_handle).expect("Where's the dt1?");
+                let palette = palette_assets.get(&palette_handle).expect("Wheres the palette?");
+
+                let loader = &data.world.read_resource::<Loader>();
+                let texture_storage = &data.world.read_resource::<AssetStorage<Texture>>();
+                let spritesheet_storage = &data.world.read_resource::<AssetStorage<SpriteSheet>>();
+
+                let (texture_data, sprites) = dt1.to_sprites(&palette);
                 let texture_handle = loader.load_from_data(
                     texture_data,
                     &mut self.progress_counter,
@@ -273,6 +319,7 @@ impl D2 {
             progress_counter: ProgressCounter::new(),
             is_initialized: false,
             dc6_palettes_to_convert: vec![],
+            dt1_sprites_to_convert: vec![],
             handles_to_spawn: vec![],
             dt1_handle: None,
         }

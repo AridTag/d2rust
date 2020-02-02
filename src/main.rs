@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 extern crate amethyst;
 extern crate amethyst_imgui;
+extern crate byteorder;
 extern crate mpq;
 
 use crate::asset_formats::{D2sAsset, Dc6Asset, PaletteAsset, Dt1Asset};

@@ -10,6 +10,8 @@ use amethyst::renderer::{
 };
 use crate::asset_formats::PaletteAsset;
 use std::cmp::max;
+use std::io::{Cursor, Seek, SeekFrom, Read};
+use byteorder::ReadBytesExt;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dt1Format;
@@ -73,18 +75,18 @@ impl Dt1Asset {
         let mut pixel_data = vec![0u8; (texture_width * texture_height * 4) as usize];
         let mut texture_starty: u32 = 0;
         let mut texture_row: u32 = 0; // TODO: When a better texture size is calculated this should be updated
+        let mut sprite_start_x: u32 = 0;
+        let mut texture_startx: u32 = 0;
         for (tile_index, tile) in dt1.tiles.iter().enumerate() {
             if texture_row > 0 {
                 let range = (0 as usize)..(texture_row as usize);
                 texture_starty = row_heights[range].iter().sum();
             }
 
-            let mut texture_startx: u32 = 0;
-            let mut sprite_start_x: u32 = 0;
             for (subtile_index, subtile) in tile.sub_tiles.iter().enumerate() {
                 match subtile.format {
                     TileFormat::Isometric => {
-                        //Dt1Asset::draw_isometric_subtile(&pixel_data, sprite_start_x + subtile.x, texture_starty + subtile.y, &subtile.encoded_data)
+                        //Dt1Asset::draw_isometric_subtile(&pixel_data, sprite_start_x + subtile.x, texture_starty + (-subtile.y), &subtile.encoded_data)
                         // isometric tile data is always 256 bytes
                         if subtile.encoded_data.len() != 256 {
                             // TODO: error
@@ -99,7 +101,7 @@ impl Dt1Asset {
                             let mut x = x_jumps[y_index];
                             for p in 0..*pixel_count {
                                 let pixel_x = sprite_start_x + subtile.x as u32 + x;
-                                let pixel_y = texture_starty + (-subtile.y) as u32 + y_index as u32;
+                                let pixel_y = texture_starty + subtile.y.abs() as u32 + y_index as u32;
                                 let pixel_data_index = (texture_starty + texture_startx + (pixel_x * 4) + (stride * pixel_y)) as usize;
                                 let palette_index = subtile.encoded_data[data_index];
                                 let pixel_color: [u8; 3] = palette.0.colors[palette_index as usize];
@@ -115,7 +117,40 @@ impl Dt1Asset {
                     }
 
                     TileFormat::Standard(_) => {
-                        Dt1Asset::draw_standard_subtile(&pixel_data, sprite_start_x + subtile.x as u32, texture_starty + (-subtile.y) as u32, &subtile.encoded_data)
+                        //Dt1Asset::draw_standard_subtile(&pixel_data, sprite_start_x + subtile.x as u32, texture_starty + (-subtile.y) as u32, &subtile.encoded_data)
+                        let mut x = 0u32;
+                        let mut y = 0u32;
+
+                        let mut reader = Cursor::new(&subtile.encoded_data);
+                        while reader.position() < subtile.encoded_data.len() as u64 {
+                            let b1 = reader.read_u8().expect("");
+
+                            if reader.position() >= subtile.encoded_data.len() as u64 {
+                                // TODO: Why are we hitting this condition?
+                                break;
+                            }
+                            let b2 = reader.read_u8().expect("");
+                            if b1 != 0 || b2 != 0 {
+                                x += b1 as u32;
+                                for i in 0..b2 {
+                                    let pixel_x = sprite_start_x + subtile.x as u32 + x;
+                                    let pixel_y = texture_starty + subtile.y.abs() as u32 + y as u32;
+                                    let pixel_data_index = (texture_starty + texture_startx + (pixel_x * 4) + (stride * pixel_y)) as usize;
+                                    if pixel_data_index >= pixel_data.len() {
+                                        continue;
+                                    }
+                                    let palette_index = reader.read_u8().expect("");
+                                    let pixel_color: [u8; 3] = palette.0.colors[palette_index as usize];
+                                    pixel_data[pixel_data_index + 0] = pixel_color[2];
+                                    pixel_data[pixel_data_index + 1] = pixel_color[1];
+                                    pixel_data[pixel_data_index + 2] = pixel_color[0];
+                                    pixel_data[pixel_data_index + 3] = 255;
+                                }
+                            } else {
+                                x = 0;
+                                y += 1;
+                            }
+                        }
                     }
                 }
             }
@@ -124,7 +159,7 @@ impl Dt1Asset {
                 texture_width,
                 texture_height,
                 tile.width as u32,
-                (-tile.height) as u32,
+                tile.height.abs() as u32,
                 sprite_start_x,
                 texture_starty,
                 [
