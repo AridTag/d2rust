@@ -1,3 +1,5 @@
+## This repo has been archived. I do not plan to work on it any longer and there are several security vulnerabilities with used rust crates.
+
 ## d2rust
 
 ### Purpose
